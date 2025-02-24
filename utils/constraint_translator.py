@@ -19,12 +19,17 @@ def translate_constraint_to_code(nl_constraint: str, num_turnos: int) -> str:
         "NO agregues explicaciones, comentarios ni bloques de código adicionales. "
         "NO inventes nuevas variables como 'N', 'M', 'T', 'i', 'j'. "
         "Usa ÚNICAMENTE estas variables:\n"
-        "- 'x' (diccionario de variables binarias de decisión, indexado por [r, t], donde 'r' es el retén y 't' el turno)\n"
+        "- 'x' (diccionario de variables binarias de decisión, indexado por [r, d, t], donde:\n"
+        "     - 'r' es el retén (0 <= r < num_retenes)\n"
+        "     - 'd' es el día (0 <= d < num_dias)\n"
+        "     - 't' es el turno (0 <= t < num_turnos))\n"
         "- 'num_retenes' (número total de retenes disponibles)\n"
-        "- 'num_turnos' (número total de turnos disponibles)\n"
+        "- 'num_dias' (número total de días de planificación)\n"
+        "- 'num_turnos' (número total de turnos por día, típicamente 2)\n"
         "- 'model' (instancia de Gurobi Model)\n"
-        "⚠️ IMPORTANTE: Si `num_turnos=2`, el modelo es cíclico, lo que significa que `x[r, 0]` representa el primer turno del día "
-        "y `x[r, 1]` representa el segundo turno del día, pero después de `t=1`, vuelve a `t=0` en el día siguiente.\n"
+        "- 'quicksum' (para sumas dentro de restricciones en Gurobi)\n"
+        "⚠️ IMPORTANTE: El modelo es cíclico en días, lo que significa que si `d=num_dias-1`, el día siguiente es `d=0`.\n"
+        "Si la restricción involucra varios días, usa `d+1` y emplea módulo `% num_dias` para evitar errores de indexación.\n"
         "Devuelve SOLO el código válido sin formato Markdown ni explicaciones.\n\n"
         f"Restricción: {nl_constraint}"
     )
@@ -45,10 +50,6 @@ def translate_constraint_to_code(nl_constraint: str, num_turnos: int) -> str:
         # 🚨 Validamos que OpenAI no genere código fuera de rango
         if "t+1" in raw_output and num_turnos <= 2:
             print(f"⚠ ERROR: OpenAI intentó acceder a t+1 con num_turnos=2. Generando código corregido...")
-            return """
-            for r in range(num_retenes):
-                model.addConstr(x[r, 0] + x[r, 1] + x[r, 0] <= 2, name=f"descanso_reten_{r}")
-            """
 
         return raw_output  # Devolvemos solo el código generado
 

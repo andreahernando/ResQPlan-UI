@@ -36,7 +36,8 @@ if __name__ == "__main__":
                 "GRB": gp.GRB,
                 "x": model.x,
                 "num_retenes": model.num_retenes,
-                "num_turnos": model.num_turnos
+                "num_turnos": model.num_turnos,
+                "num_dias": model.dias  # ✅ Se pasa num_dias en lugar de dias
             }
 
             try:

@@ -74,27 +74,30 @@ class ShiftOptimizer:
         )
 
     def optimizar(self):
-        """ Ejecuta la optimización y muestra el estado de los retenes """
+        """ Ejecuta la optimización y muestra el estado de los retenes basado en las últimas 48 horas """
         self.model.optimize()
 
         if self.model.status == GRB.OPTIMAL:
             print("\n✅ Solución óptima encontrada:")
             print(f"🔹 Total de restricciones en el modelo: {self.model.NumConstrs}")
 
-            print("\n📊 Estado de los retenes tras la optimización:")
+            print("\n📊 Estado de los retenes tras la optimización (últimos 2 días):")
             for r in range(self.num_retenes):
-                horas_trabajadas = sum(self.x[r, d, t].x * 12 for d in range(self.dias) for t in range(self.num_turnos))
+                # Consideramos solo los últimos 2 días (d-1 y d-2) si existen
+                horas_trabajadas = sum(self.x[r, d, t].x * 12 for d in range(max(0, self.dias - 2), self.dias) for t in
+                                       range(self.num_turnos))
 
-                if horas_trabajadas >= 48:
+                if horas_trabajadas >= 24:
                     estado_reten = "🟢 Verde"
-                elif horas_trabajadas >= 36:
+                elif horas_trabajadas >= 18:
                     estado_reten = "🟡 Amarillo"
-                elif horas_trabajadas >= 24:
+                elif horas_trabajadas >= 12:
                     estado_reten = "🟠 Naranja"
                 else:
                     estado_reten = "🔴 Rojo"
 
                 print(f"Retén {r} - Estado: {estado_reten}")
+
 
         elif self.model.status == GRB.INFEASIBLE:
             print("\n❌ El modelo es infactible. Ejecutando análisis IIS para identificar el problema...")
