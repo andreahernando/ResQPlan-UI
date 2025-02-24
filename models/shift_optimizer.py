@@ -1,16 +1,16 @@
 from gurobipy import Model, GRB, quicksum
 
-
 class ShiftOptimizer:
-    def __init__(self, num_retenes=22, num_turnos=2, max_activos=4, descanso_min=12):
-        self.num_retenes = num_retenes  # Total de retenes disponibles (11 del Cabildo + 11 de Gesplan)
-        self.num_turnos = num_turnos  # 2 turnos (diurno y nocturno)
-        self.max_activos = max_activos  # Máximo de retenes activos por turno
-        self.descanso_min = descanso_min  # Descanso mínimo antes de volver a trabajar
+    def __init__(self, num_retenes=22, num_turnos=2, max_activos=4, descanso_min=12, dias=28):
+        self.num_retenes = num_retenes
+        self.num_turnos = num_turnos
+        self.max_activos = max_activos
+        self.descanso_min = descanso_min
+        self.dias = dias
 
         # Crear modelo
         self.model = Model("Optimización de Turnos de Retenes")
-        self.x = {}  # Variables de decisión
+        self.x = {}
 
         self._definir_variables()
         self._definir_restricciones()
@@ -19,72 +19,77 @@ class ShiftOptimizer:
     def _definir_variables(self):
         """ Define las variables de decisión """
         for r in range(self.num_retenes):
-            for t in range(self.num_turnos):
-                self.x[r, t] = self.model.addVar(vtype=GRB.BINARY, name=f"x_{r}_{t}")
+            for d in range(self.dias):
+                for t in range(self.num_turnos):
+                    self.x[r, d, t] = self.model.addVar(vtype=GRB.BINARY, name=f"x_{r}_{d}_{t}")
 
     def _definir_restricciones(self):
         """ Define las restricciones del modelo """
 
-        # Un retén solo puede estar en un turno a la vez
         for r in range(self.num_retenes):
-            self.model.addConstr(quicksum(self.x[r, t] for t in range(self.num_turnos)) <= 1,
-                                 name=f"reten_{r}_un_turno")
+            for d in range(self.dias):
+                self.model.addConstr(quicksum(self.x[r, d, t] for t in range(self.num_turnos)) <= 1,
+                                     name=f"reten_{r}_un_turno_dia_{d}")
 
-        # Entre 3 y 4 retenes activos por turno
-        for t in range(self.num_turnos):
-            expr = quicksum(self.x[r, t] for r in range(self.num_retenes))
-            self.model.addConstr(expr <= self.max_activos, name=f"max_retenes_turno_{t}")
-            self.model.addConstr(expr >= 3, name=f"min_retenes_turno_{t}")
+        for d in range(self.dias):
+            for t in range(self.num_turnos):
+                expr = quicksum(self.x[r, d, t] for r in range(self.num_retenes))
+                self.model.addConstr(expr <= self.max_activos, name=f"max_retenes_turno_{d}_{t}")
+                self.model.addConstr(expr >= 3, name=f"min_retenes_turno_{d}_{t}")
 
-        # Garantizar descanso mínimo de 12 horas antes de reincorporarse
         for r in range(self.num_retenes):
-            self.model.addConstr(self.x[r, 0] + self.x[r, 1] <= 2,
-                                 name=f"descanso_minimo_{r}")
+            for d in range(self.dias - 1):
+                self.model.addConstr(self.x[r, d, 1] + self.x[r, (d + 1) % self.dias, 0] <= 1,
+                                     name=f"descanso_minimo_{r}_dia_{d}")
 
-        # Implementar ciclo de rotación de turnos flexible
         for r in range(self.num_retenes):
-            self.model.addConstr(self.x[r, 0] + self.x[r, 1] <= 2,
-                                 name=f"rotacion_ciclo_{r}")
+            for d in range(self.dias - 5):
+                self.model.addConstr(
+                    self.x[r, d, 1] + self.x[r, d+1, 1] + self.x[r, d+2, 0] +
+                    self.x[r, d+3, 0] + self.x[r, d+4, 1] + self.x[r, d+5, 1] <= 2,
+                    name=f"ciclo_turnos_ideal_{r}_dia_{d}")
 
-        # Permitir relevos nocturnos solo si el retén ya trabajó antes
         for r in range(self.num_retenes):
-            self.model.addConstr(self.x[r, 1] <= self.x[r, 0] + 1,
-                                 name=f"evitar_relevos_noche_{r}")
+            for d in range(self.dias):
+                self.model.addConstr(self.x[r, d, 1] <= self.x[r, d, 0] + 1,
+                                     name=f"evitar_relevos_noche_{r}_dia_{d}")
+
+        for d in range(self.dias):
+            self.model.addConstr(
+                quicksum(self.x[r, d, 0] for r in range(self.num_retenes)) >=
+                quicksum(self.x[r, d, 1] for r in range(self.num_retenes)),
+                name=f"solapamiento_turnos_{d}")
+
+        for r in range(self.num_retenes):
+            for d in range(self.dias):
+                self.model.addConstr(
+                    quicksum(self.x[r, d - i, t] for i in range(3) for t in range(self.num_turnos) if d - i >= 0) <= 2,
+                    name=f"relevos_dinamicos_{r}_dia_{d}")
 
     def _definir_funcion_objetivo(self):
         """ Define la función objetivo para minimizar la carga desigual de trabajo """
         self.model.setObjective(
-            quicksum(self.x[r, t] for r in range(self.num_retenes) for t in range(self.num_turnos)),
+            quicksum(self.x[r, d, t] for r in range(self.num_retenes) for d in range(self.dias) for t in range(self.num_turnos)),
             GRB.MINIMIZE
         )
 
     def optimizar(self):
-        """ Ejecuta la optimización y depura si el modelo es infactible """
+        """ Ejecuta la optimización y muestra el estado de los retenes """
         self.model.optimize()
 
         if self.model.status == GRB.OPTIMAL:
             print("\n✅ Solución óptima encontrada:")
             print(f"🔹 Total de restricciones en el modelo: {self.model.NumConstrs}")
 
-            print("\n📌 Restricciones activas en el modelo:")
-            for constr in self.model.getConstrs():
-                print(f"- {constr.ConstrName}")
-
-            print("\n📝 Turnos asignados a los retenes:")
-            for r in range(self.num_retenes):
-                turnos_asignados = [t for t in range(self.num_turnos) if self.x[r, t].x > 0.5]
-                estado = " | ".join([f"Turno {t}" for t in turnos_asignados]) if turnos_asignados else "No asignado"
-                print(f"Retén {r}: {estado}")
-
             print("\n📊 Estado de los retenes tras la optimización:")
             for r in range(self.num_retenes):
-                tiempo_trabajado = sum(self.x[r, t].x * 12 for t in range(self.num_turnos))  # Obtener valores óptimos
+                horas_trabajadas = sum(self.x[r, d, t].x * 12 for d in range(self.dias) for t in range(self.num_turnos))
 
-                if tiempo_trabajado >= 8:
+                if horas_trabajadas >= 48:
                     estado_reten = "🟢 Verde"
-                elif tiempo_trabajado >= 6:
+                elif horas_trabajadas >= 36:
                     estado_reten = "🟡 Amarillo"
-                elif tiempo_trabajado >= 2:
+                elif horas_trabajadas >= 24:
                     estado_reten = "🟠 Naranja"
                 else:
                     estado_reten = "🔴 Rojo"

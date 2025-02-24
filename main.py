@@ -1,6 +1,7 @@
 from models.shift_optimizer import ShiftOptimizer
 from utils.constraint_translator import translate_constraint_to_code
 import gurobipy as gp
+from utils.result_visualizer import exportar_resultados
 
 if __name__ == "__main__":
     print("Running shift optimization...\n")
@@ -62,3 +63,7 @@ if __name__ == "__main__":
 
     # Ejecutar optimización
     model.optimizar()
+
+    # Exportar los resultados tras la optimización
+    exportar_resultados(model, model.x, model.num_retenes, model.num_turnos, model.dias)
+
