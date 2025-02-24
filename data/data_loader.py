@@ -1,0 +1,1 @@
+""" Si hay que cargar datos desde un bd se haría aquí"""
