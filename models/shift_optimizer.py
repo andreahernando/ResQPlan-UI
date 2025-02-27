@@ -1,113 +1,112 @@
 from gurobipy import Model, GRB, quicksum
 
 class ShiftOptimizer:
-    def __init__(self, num_retenes=22, num_turnos=2, max_activos=4, descanso_min=12, dias=28):
+    def __init__(self, num_retenes=22, dias=10):
+        """
+        Se asume que 'dias' es múltiplo de 5 para garantizar que cada ciclo completo
+        (2 días en un turno, 1 descanso, 2 días en el otro turno) se repita sin interrupciones.
+        """
         self.num_retenes = num_retenes
-        self.num_turnos = num_turnos
-        self.max_activos = max_activos
-        self.descanso_min = descanso_min
         self.dias = dias
-
-        # Crear modelo
+        self.num_turnos = 2  # Se definen 2 turnos por día
         self.model = Model("Optimización de Turnos de Retenes")
-        self.x = {}
 
-        self._definir_variables()
+        # Variables de decisión:
+        self.y = {r: self.model.addVar(vtype=GRB.BINARY, name=f"y_{r}") for r in range(self.num_retenes)}
+        self.p = {r: self.model.addVar(vtype=GRB.BINARY, name=f"p_{r}") for r in range(self.num_retenes)}
+        self.z = {r: self.model.addVar(vtype=GRB.BINARY, name=f"z_{r}") for r in range(self.num_retenes)}
+
+        # Nueva variable: d[r, d, t] indica si el retén r trabaja en el turno t en el día d
+        self.d = {(r, d, t): self.model.addVar(vtype=GRB.BINARY, name=f"d_{r}_{d}_{t}")
+                  for r in range(self.num_retenes) for d in range(self.dias) for t in range(self.num_turnos)}
+
+        self.model.update()
+
+        # Linealización de z[r] = y[r] * p[r]
+        for r in range(self.num_retenes):
+            self.model.addConstr(self.z[r] <= self.y[r], name=f"lin1_{r}")
+            self.model.addConstr(self.z[r] <= self.p[r], name=f"lin2_{r}")
+            self.model.addConstr(self.z[r] >= self.y[r] + self.p[r] - 1, name=f"lin3_{r}")
+
         self._definir_restricciones()
         self._definir_funcion_objetivo()
 
-    def _definir_variables(self):
-        """ Define las variables de decisión """
-        for r in range(self.num_retenes):
-            for d in range(self.dias):
-                for t in range(self.num_turnos):
-                    self.x[r, d, t] = self.model.addVar(vtype=GRB.BINARY, name=f"x_{r}_{d}_{t}")
-
     def _definir_restricciones(self):
-        """ Define las restricciones del modelo """
+        """
+        Impone las restricciones de cobertura de turnos:
+        - Cada día, en cada turno, la cantidad de retenes activos debe estar entre 6 y 8.
+        - Cada retén debe seguir el ciclo `2-1-2` correctamente.
+        """
 
+        # 🔹 RESTRICCIONES PARA EL CICLO 2-1-2 DE LOS RETENES
         for r in range(self.num_retenes):
             for d in range(self.dias):
-                self.model.addConstr(quicksum(self.x[r, d, t] for t in range(self.num_turnos)) <= 1,
-                                     name=f"reten_{r}_un_turno_dia_{d}")
+                j = (d - (r % 5)) % 5  # Día en el ciclo de 5 días
 
+                # 🔹 Día de descanso forzado después de cada secuencia de 2 días de trabajo
+                if j in [2, 5]:  # Antes solo teníamos `j == 2`, ahora agregamos `j == 5`
+                    for t in range(self.num_turnos):
+                        self.model.addConstr(self.d[r, d, t] == 0, name=f"descanso_{r}_{d}_{t}")
+
+                # 🔹 Turnos según el patrón 2-1-2-1-2...
+                else:
+                    for t in range(self.num_turnos):
+                        if j in [0, 1]:  # Trabaja en el mismo turno dos días
+                            self.model.addConstr(
+                                self.d[r, d, t] == self.y[r] * (1 - self.p[r] if t == 1 else self.p[r]),
+                                name=f"trabajo_{r}_{d}_{t}_inicio")
+                        elif j in [3, 4]:  # Cambia de turno tras el descanso
+                            self.model.addConstr(
+                                self.d[r, d, t] == self.y[r] * (self.p[r] if t == 1 else 1 - self.p[r]),
+                                name=f"trabajo_{r}_{d}_{t}_fin")
+
+        # 🔹 RESTRICCIONES PARA LA COBERTURA MÍNIMA Y MÁXIMA POR TURNO
         for d in range(self.dias):
             for t in range(self.num_turnos):
-                expr = quicksum(self.x[r, d, t] for r in range(self.num_retenes))
-                self.model.addConstr(expr <= self.max_activos, name=f"max_retenes_turno_{d}_{t}")
-                self.model.addConstr(expr >= 3, name=f"min_retenes_turno_{d}_{t}")
+                expr = quicksum(self.d[r, d, t] for r in range(self.num_retenes))
+                self.model.addConstr(expr >= 6, name=f"min_turno{t}_dia_{d}")
+                self.model.addConstr(expr <= 8, name=f"max_turno{t}_dia_{d}")
 
-        for r in range(self.num_retenes):
-            for d in range(self.dias - 1):
-                self.model.addConstr(self.x[r, d, 1] + self.x[r, (d + 1) % self.dias, 0] <= 1,
-                                     name=f"descanso_minimo_{r}_dia_{d}")
+        # 🔹 Balanceo en el uso de patrones
+        self.model.addConstr(quicksum(self.p[r] for r in range(self.num_retenes)) >= self.num_retenes * 0.3,
+                             name="min_pattern1")
+        self.model.addConstr(quicksum(self.p[r] for r in range(self.num_retenes)) <= self.num_retenes * 0.7,
+                             name="max_pattern1")
 
-        for r in range(self.num_retenes):
-            for d in range(self.dias - 5):
-                self.model.addConstr(
-                    self.x[r, d, 1] + self.x[r, d+1, 1] + self.x[r, d+2, 0] +
-                    self.x[r, d+3, 0] + self.x[r, d+4, 1] + self.x[r, d+5, 1] <= 2,
-                    name=f"ciclo_turnos_ideal_{r}_dia_{d}")
-
-        for r in range(self.num_retenes):
-            for d in range(self.dias):
-                self.model.addConstr(self.x[r, d, 1] <= self.x[r, d, 0] + 1,
-                                     name=f"evitar_relevos_noche_{r}_dia_{d}")
-
-        for d in range(self.dias):
+        # 🔹 Balanceo de offset (evita que solo ciertos retenes sean elegidos)
+        for offset in range(5):
             self.model.addConstr(
-                quicksum(self.x[r, d, 0] for r in range(self.num_retenes)) >=
-                quicksum(self.x[r, d, 1] for r in range(self.num_retenes)),
-                name=f"solapamiento_turnos_{d}")
-
-        for r in range(self.num_retenes):
-            for d in range(self.dias):
-                self.model.addConstr(
-                    quicksum(self.x[r, d - i, t] for i in range(3) for t in range(self.num_turnos) if d - i >= 0) <= 2,
-                    name=f"relevos_dinamicos_{r}_dia_{d}")
+                quicksum(self.y[r] for r in range(self.num_retenes) if r % 5 == offset) >= self.num_retenes / 5 * 0.6,
+                name=f"balance_offset_{offset}"
+            )
 
     def _definir_funcion_objetivo(self):
-        """ Define la función objetivo para minimizar la carga desigual de trabajo """
+        """
+        Minimizamos la cantidad de retenes activos, pero también incentivamos diversidad en la cobertura.
+        """
         self.model.setObjective(
-            quicksum(self.x[r, d, t] for r in range(self.num_retenes) for d in range(self.dias) for t in range(self.num_turnos)),
+            quicksum(self.y[r] for r in range(self.num_retenes))
+            + 0.1 * quicksum(self.p[r] for r in range(self.num_retenes)),  # 🔹 Fomenta diversidad de patrones
             GRB.MINIMIZE
         )
 
     def optimizar(self):
-        """ Ejecuta la optimización y muestra el estado de los retenes basado en las últimas 48 horas """
+        """Ejecuta la optimización y muestra los resultados."""
         self.model.optimize()
 
         if self.model.status == GRB.OPTIMAL:
-            print("\n✅ Solución óptima encontrada:")
-            print(f"🔹 Total de restricciones en el modelo: {self.model.NumConstrs}")
-
-            print("\n📊 Estado de los retenes tras la optimización (últimos 2 días):")
+            print("✅ Solución óptima encontrada")
+            print("Retenes activos y sus parámetros:")
             for r in range(self.num_retenes):
-                # Consideramos solo los últimos 2 días (d-1 y d-2) si existen
-                horas_trabajadas = sum(self.x[r, d, t].x * 12 for d in range(max(0, self.dias - 2), self.dias) for t in
-                                       range(self.num_turnos))
+                if self.y[r].x > 0.5:
+                    pattern = 1 if self.p[r].x > 0.5 else 0
+                    offset = r % 5
+                    print(f"  Retén {r}: activo, offset = {offset}, pattern = {pattern}")
 
-                if horas_trabajadas >= 24:
-                    estado_reten = "🟢 Verde"
-                elif horas_trabajadas >= 18:
-                    estado_reten = "🟡 Amarillo"
-                elif horas_trabajadas >= 12:
-                    estado_reten = "🟠 Naranja"
-                else:
-                    estado_reten = "🔴 Rojo"
-
-                print(f"Retén {r} - Estado: {estado_reten}")
-
-
-        elif self.model.status == GRB.INFEASIBLE:
-            print("\n❌ El modelo es infactible. Ejecutando análisis IIS para identificar el problema...")
-
-            self.model.computeIIS()
-            print("\n⚠ Restricciones responsables de la infactibilidad:")
-            for constr in self.model.getConstrs():
-                if constr.IISConstr:
-                    print(f"- {constr.ConstrName}")
-
-            print("\n🔍 Revisa las restricciones marcadas y ajusta el modelo.")
+            print("\nCobertura diaria (suma de aportes por turno):")
+            for d in range(self.dias):
+                for t in range(self.num_turnos):
+                    cobertura = sum(self.d[r, d, t].x for r in range(self.num_retenes))
+                    print(f"  Día {d}, Turno {t}: {cobertura:.1f} retenes")
         else:
-            print("No se encontró solución óptima.")
+            print("❌ No se encontró una solución óptima.")

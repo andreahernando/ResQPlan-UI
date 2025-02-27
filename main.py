@@ -34,7 +34,6 @@ if __name__ == "__main__":
                 "model": model.model,
                 "quicksum": gp.quicksum,
                 "GRB": gp.GRB,
-                "x": model.x,
                 "num_retenes": model.num_retenes,
                 "num_turnos": model.num_turnos,
                 "num_dias": model.dias  # ✅ Se pasa num_dias en lugar de dias
@@ -65,6 +64,20 @@ if __name__ == "__main__":
     # Ejecutar optimización
     model.optimizar()
 
-    # Exportar los resultados tras la optimización
-    exportar_resultados(model, model.x, model.num_retenes, model.num_turnos, model.dias)
+    # Verificar si se encontró una solución antes de exportar
+    if model.model.status == gp.GRB.OPTIMAL:
+        x = {}
 
+        print("\n🔍 Depuración de valores de x antes de exportar:")
+        for r in range(model.num_retenes):
+            for d in range(model.dias):
+                for t in range(model.num_turnos):
+                    valor = model.d[r, d, t].x
+                    x[(r, d, t)] = valor
+                    if valor > 0.5:
+                        print(f"  ✅ x[{r}, {d}, {t}] = {valor}")
+
+        exportar_resultados(model, x, model.num_retenes, model.num_turnos, model.dias)
+
+    else:
+        print("❌ No se encontró una solución óptima. No se exportarán resultados.")
