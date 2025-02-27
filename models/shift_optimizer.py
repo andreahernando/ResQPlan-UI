@@ -45,10 +45,14 @@ class ShiftOptimizer:
                     for t in range(self.num_turnos):
                         self.model.addConstr(self.d[r, d, t] == 0, name=f"descanso_{r}_{d}_{t}")
 
-        # 🔹 Forzar que todos los retenes sean utilizados al menos una vez
+        # 🔹 Forzar que todos los retenes trabajen al menos 4 días en cada periodo de 7 días
         for r in range(self.num_retenes):
-            self.model.addConstr(quicksum(self.d[r, d, t] for d in range(self.dias) for t in range(self.num_turnos)) >= 4,
-                                 name=f"uso_minimo_{r}")
+            for start_day in range(0, self.dias, 7):  # Iterar por bloques de 7 días
+                self.model.addConstr(
+                    quicksum(self.d[r, d, t] for d in range(start_day, min(start_day + 7, self.dias)) for t in
+                             range(self.num_turnos)) >= 4,
+                    name=f"uso_minimo_{r}_semana_{start_day // 7}"
+                )
 
         # 🔹 Restricciones de cobertura mínima y máxima por turno
         for d in range(self.dias):
