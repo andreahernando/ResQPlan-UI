@@ -1,7 +1,7 @@
 from gurobipy import Model, GRB, quicksum
 
 class ShiftOptimizer:
-    def __init__(self, num_retenes=22, dias=10):
+    def __init__(self, num_retenes=22, dias=7):
         """
         Se asume que 'dias' es múltiplo de 6 para garantizar que cada ciclo completo
         (2 días en un turno, 1 descanso, 2 días en el otro turno, 1 descanso) se repita sin errores.
@@ -24,14 +24,11 @@ class ShiftOptimizer:
     def _definir_restricciones(self):
         """
         Define las restricciones del modelo:
-        - Un retén trabaja 2 días seguidos en el mismo turno.
-        - Descansa 1 día después de esos 2 días de trabajo.
-        - Luego trabaja 2 días en el turno opuesto.
-        - Se repite el ciclo.
+        - Cada retén sigue un ciclo de 6 días: 2 días en un turno, 1 descanso, 2 días en el otro turno, 1 descanso.
         """
         for r in range(self.num_retenes):
             for d in range(self.dias):
-                j = (d - (r % 6)) % 6  # Ciclo de 6 días para asegurar descansos correctos
+                j = (d - (r % 6)) % 6  # Ciclo de 6 días
 
                 # 🔹 Trabaja 2 días seguidos en el mismo turno
                 if j in [0, 1]:  # Primeros dos días de trabajo
@@ -43,10 +40,15 @@ class ShiftOptimizer:
                         self.model.addConstr(self.d[r, d, t] == self.y[r] * (self.p[r] if t == 1 else 1 - self.p[r]),
                                              name=f"trabajo_opuesto_{r}_{d}_{t}")
 
-                # 🔹 Forzar el descanso después de trabajar 2 días seguidos
-                if j in [2, 5]:  # Día de descanso obligatorio después de cada ciclo de 2 días
+                # 🔹 Descansa en los días 2 y 5 (después de trabajar 2 días seguidos)
+                if j in [2, 5]:
                     for t in range(self.num_turnos):
                         self.model.addConstr(self.d[r, d, t] == 0, name=f"descanso_{r}_{d}_{t}")
+
+        # 🔹 Forzar que todos los retenes sean utilizados al menos una vez
+        for r in range(self.num_retenes):
+            self.model.addConstr(quicksum(self.d[r, d, t] for d in range(self.dias) for t in range(self.num_turnos)) >= 4,
+                                 name=f"uso_minimo_{r}")
 
         # 🔹 Restricciones de cobertura mínima y máxima por turno
         for d in range(self.dias):
