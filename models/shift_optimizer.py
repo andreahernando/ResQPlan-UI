@@ -1,18 +1,23 @@
 from gurobipy import Model, GRB, quicksum
 
+
 class ShiftOptimizer:
-    def __init__(self, num_retenes=22, dias=2):
+    def __init__(self, num_retenes=22, dias=5, min_retenes=6, max_retenes=8):
         """
-        Se asume que los retenes siguen un patrón de trabajo:
-        - 2 días en un turno
-        - 1 día de descanso
-        - 2 días en el turno opuesto
-        - 1 día de descanso
-        Este patrón se mantiene cíclico sin importar el número de días en la simulación.
+        Modelo parametrizado de optimización de turnos de retenes.
+
+        Parámetros:
+        - num_retenes: Número total de retenes disponibles.
+        - dias: Número total de días de planificación.
+        - min_retenes: Mínimo número de retenes por turno.
+        - max_retenes: Máximo número de retenes por turno.
         """
         self.num_retenes = num_retenes
         self.dias = dias
-        self.num_turnos = 2  # Se definen 2 turnos por día
+        self.num_turnos = 2  # Siempre hay 2 turnos por día
+        self.min_retenes = min_retenes
+        self.max_retenes = max_retenes
+
         self.model = Model("Optimización de Turnos de Retenes")
 
         # Variables de decisión:
@@ -28,10 +33,9 @@ class ShiftOptimizer:
     def _definir_restricciones(self):
         """
         Define las restricciones del modelo:
-        - Cada retén sigue un ciclo flexible: 2 días en un turno, 1 descanso, 2 días en el otro turno, 1 descanso.
-        - Funciona para cualquier cantidad de días sin necesidad de ser múltiplo de 6.
+        - Cada retén sigue un ciclo fijo: 2 días en un turno, 1 descanso, 2 días en el otro turno, 1 descanso.
         """
-
+        """ 
         for r in range(self.num_retenes):
             for d in range(self.dias):
                 j = (d - (r % 6)) % 6  # Determina la fase del ciclo
@@ -54,45 +58,29 @@ class ShiftOptimizer:
                 if j in [2, 5]:
                     for t in range(self.num_turnos):
                         self.model.addConstr(self.d[r, d, t] == 0, name=f"descanso_{r}_{d}_{t}")
-
-        # 🔹 Restricción de cobertura mínima y máxima por turno
+        """
+        # 🔹 Restricción de cobertura mínima y máxima por turno (usando parámetros)
         for d in range(self.dias):
             for t in range(self.num_turnos):
                 expr = quicksum(self.d[r, d, t] for r in range(self.num_retenes))
-                self.model.addConstr(expr >= 6, name=f"min_turno{t}_dia_{d}")  # Min 6 retenes por turno
-                self.model.addConstr(expr <= 8, name=f"max_turno{t}_dia_{d}")  # Max 8 retenes por turno
+                self.model.addConstr(expr >= self.min_retenes, name=f"min_turno{t}_dia_{d}")
+                self.model.addConstr(expr <= self.max_retenes, name=f"max_turno{t}_dia_{d}")
 
     def _definir_funcion_objetivo(self):
         """
-        Modifica la función objetivo para maximizar la equidad en la distribución del trabajo
-        en lugar de minimizar retenes activos.
+        Minimiza la diferencia en la carga de trabajo entre retenes.
         """
-
-        # Variables auxiliares de desviación para el número de retenes por turno
-        exceso = {(d, t): self.model.addVar(vtype=GRB.CONTINUOUS, name=f"exceso_{d}_{t}")
-                  for d in range(self.dias) for t in range(self.num_turnos)}
-        defecto = {(d, t): self.model.addVar(vtype=GRB.CONTINUOUS, name=f"defecto_{d}_{t}")
-                   for d in range(self.dias) for t in range(self.num_turnos)}
-
-        # Variables para medir la carga de trabajo total de cada retén
         carga_trabajo = {r: self.model.addVar(vtype=GRB.CONTINUOUS, name=f"carga_{r}")
                          for r in range(self.num_retenes)}
 
-        # Restricciones para capturar el exceso o defecto de retenes por turno
-        for d in range(self.dias):
-            for t in range(self.num_turnos):
-                total_retenes = quicksum(self.d[r, d, t] for r in range(self.num_retenes))
-                self.model.addConstr(total_retenes >= 6 - defecto[d, t], name=f"min_retenes_turno_{d}_{t}")
-                self.model.addConstr(total_retenes <= 8 + exceso[d, t], name=f"max_retenes_turno_{d}_{t}")
-
-        # Calcular la carga de trabajo total de cada retén (cuántos turnos ha trabajado)
+        # Calcular la carga de trabajo total de cada retén
         for r in range(self.num_retenes):
             self.model.addConstr(
                 carga_trabajo[r] == quicksum(self.d[r, d, t] for d in range(self.dias) for t in range(self.num_turnos)),
                 name=f"calculo_carga_trabajo_{r}"
             )
 
-        # **Nueva Función Objetivo:** Minimizar la diferencia entre los retenes más cargados y menos cargados
+        # Variables para minimizar la diferencia entre el retén más cargado y el menos cargado
         max_carga = self.model.addVar(vtype=GRB.CONTINUOUS, name="max_carga")
         min_carga = self.model.addVar(vtype=GRB.CONTINUOUS, name="min_carga")
 
@@ -102,7 +90,7 @@ class ShiftOptimizer:
 
         # Función objetivo: minimizar la diferencia entre la carga de trabajo máxima y mínima
         self.model.setObjective(
-            max_carga - min_carga,  # Minimizar la diferencia entre retenes más ocupados y menos ocupados
+            max_carga - min_carga,
             GRB.MINIMIZE
         )
 
@@ -128,7 +116,4 @@ class ShiftOptimizer:
             print("❌ No se encontró una solución óptima.")
 
 
-# ---- EJECUCIÓN DEL MODELO ----
-if __name__ == "__main__":
-    optimizer = ShiftOptimizer(num_retenes=22, dias=30)  # Puedes cambiar el número de días
-    optimizer.optimizar()
+
