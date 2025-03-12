@@ -6,8 +6,18 @@ from utils.result_visualizer import exportar_resultados
 if __name__ == "__main__":
     print("Running shift optimization...\n")
 
+    # Solicitar parámetros al usuario
+    try:
+        num_retenes = int(input("Ingrese el número de retenes: "))
+        dias = int(input("Ingrese el número de días: "))
+        min_retenes = int(input("Ingrese el mínimo de retenes por turno: "))
+        max_retenes = int(input("Ingrese el máximo de retenes por turno: "))
+    except ValueError:
+        print("❌ Error: Por favor, ingrese solo números enteros.")
+        exit()
+
     # Crear instancia del modelo
-    model = ShiftOptimizer()
+    model = ShiftOptimizer(num_retenes, dias, min_retenes, max_retenes)
     print(f"🔹 Restricciones en el modelo al inicio: {model.model.NumConstrs}")
 
     # Diccionario para almacenar restricciones dinámicas agregadas

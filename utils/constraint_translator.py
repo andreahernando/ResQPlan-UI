@@ -36,7 +36,7 @@ def translate_constraint_to_code(nl_constraint: str, num_turnos: int) -> str:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="o3-mini",
             messages=[
                 {"role": "system", "content": "Eres un asistente que traduce restricciones en lenguaje natural a código Gurobi. "
                                               "Asegúrate de que el código sea ejecutable dentro de ShiftOptimizer "

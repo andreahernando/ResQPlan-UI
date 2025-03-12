@@ -1,8 +1,9 @@
 import pandas as pd
 import xlsxwriter
+import os
 
 def exportar_resultados(model, x, num_retenes, num_turnos, num_dias,
-                        archivo_salida="C:/Users/cynth/Documents/Cuarto año GCID/TFG/resultados_turnos.xlsx"):
+                        archivo_salida = os.path.join(os.getcwd(), "resultados_turnos.xlsx")):
     """
     Exporta los resultados en un archivo Excel con una estructura detallada y visualización mejorada.
     Se incluyen tres hojas:
