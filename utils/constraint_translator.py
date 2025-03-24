@@ -1,10 +1,51 @@
 import os
+import json
 from openai import OpenAI
-import gurobipy as gp
 
-def translate_constraint_to_code(nl_constraint: str, num_turnos: int) -> str:
+def extract_variables_from_context(context: str) -> dict:
     """
-    Convierte una restricción en lenguaje natural a código Python compatible con Gurobi.
+    Extrae variables clave y genera las variables de decisión en formato Gurobi.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("The environment variable OPENAI_API_KEY is not set.")
+
+    client = OpenAI(api_key=api_key)
+
+    prompt = (
+        "A partir de la siguiente descripción de un problema de planificación de turnos, "
+        "extrae las variables clave necesarias para definir el modelo matemático. "
+        "Además, genera las variables de decisión en código Python usando Gurobi. "
+        "Devuelve la respuesta ÚNICAMENTE en formato JSON sin explicaciones. "
+        "Ejemplo de salida:\n"
+        '{\n  "variables": {\n    "num_retenes": 22,\n    "dias": 7,\n    "num_turnos": 2,\n    "horarios": ["08:00-20:00", "20:00-08:00"]\n  },\n'
+        '  "decision_variables": "self.d = {(r, d, t): self.model.addVar(vtype=GRB.BINARY, name=f\'d_{r}_{d}_{t}\') for r in range(self.num_retenes) for d in range(self.dias) for t in range(self.num_turnos)}"\n}'
+        f"\n\nDescripción del problema: {context}"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="o3-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        extracted_data = response.choices[0].message.content.strip()
+
+        # Convertir JSON a diccionario de manera segura
+        result = json.loads(extracted_data)
+
+        return result  # Devuelve tanto variables como el código de variables de decisión
+
+    except json.JSONDecodeError as json_err:
+        raise RuntimeError(f"Error parsing JSON response: {json_err}\nResponse received: {extracted_data}")
+    except Exception as e:
+        raise RuntimeError(f"Error extracting variables: {e}")
+
+
+
+def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
+    """
+    Convierte una restricción en lenguaje natural a código Python compatible con Gurobi,
+    usando las variables extraídas previamente.
     """
 
     api_key = os.getenv("OPENAI_API_KEY")
@@ -13,36 +54,23 @@ def translate_constraint_to_code(nl_constraint: str, num_turnos: int) -> str:
 
     client = OpenAI(api_key=api_key)
 
+    # Convertimos las variables en un formato comprensible para el prompt
+    variables_str = json.dumps(variables, indent=2)
+
     prompt = (
         "Eres un experto en optimización con Gurobi. "
         "Convierte la siguiente restricción en código Python usando model.addConstr(...). "
         "NO agregues explicaciones, comentarios ni bloques de código adicionales. "
-        "Usa ÚNICAMENTE estas variables:\n"
-        "- 'd' (diccionario de variables binarias de decisión, indexado por [r, d, t], donde:\n"
-        "     - 'r' es el retén (0 <= r < num_retenes)\n"
-        "     - 'n' es el día (0 <= n < dias)\n"
-        "     - 't' es el turno (0 <= t < num_turnos))\n"
-        "- 'num_retenes' (número total de retenes disponibles)\n"
-        "- 'dias' (número total de días de planificación)\n"
-        "- 'num_turnos' (número total de turnos por día, típicamente 2)\n"
-        "- 'model' (instancia de Gurobi Model)\n"
-        "- 'quicksum' (para sumas dentro de restricciones en Gurobi)\n"
-        "⚠️ IMPORTANTE: Si la restricción involucra número mínimo o máximo de retenes, **debes usar `min_retenes` o `max_retenes` en lugar de `num_retenes`**.\n"
-        "⚠️ NO modifiques el nombre de 'num_dias', 'num_turnos' o 'model'.\n"
-        "⚠️ NO uses model.addConstrs(), usa solo model.addConstr() dentro de un bucle for.\n"
-        "Devuelve SOLO el código válido sin formato Markdown ni explicaciones, es decir sin lo de ```python (ni al principio ni esas comillas al final).\n\n"
+        f"Las variables disponibles en este problema son:\n{variables_str}\n\n"
+        "Usa ÚNICAMENTE estas variables en tu respuesta.\n"
+        "Devuelve SOLO el código válido sin formato Markdown ni explicaciones.\n\n"
         f"Restricción: {nl_constraint}"
     )
 
     try:
         response = client.chat.completions.create(
             model="o3-mini",
-            messages=[
-                {"role": "system", "content": "Eres un asistente que traduce restricciones en lenguaje natural a código Gurobi. "
-                                              "Asegúrate de que el código sea ejecutable dentro de ShiftOptimizer "
-                                              "y que todas las variables necesarias estén bien referenciadas en 'model.d'."},
-                {"role": "user", "content": prompt}
-            ]
+            messages=[{"role": "user", "content": prompt}]
         )
 
         raw_output = response.choices[0].message.content.strip()

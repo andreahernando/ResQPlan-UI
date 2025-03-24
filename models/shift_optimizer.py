@@ -2,23 +2,15 @@ from gurobipy import Model, GRB, quicksum
 
 
 class ShiftOptimizer:
-    def __init__(self, num_retenes, dias, min_retenes, max_retenes):
+    def __init__(self, variables: dict):
         """
         Modelo parametrizado de optimización de turnos de retenes.
         """
-        self.num_retenes = num_retenes
-        self.dias = dias
-        self.num_turnos = 2  # Siempre hay 2 turnos por día
-        self.min_retenes = min_retenes
-        self.max_retenes = max_retenes
+        self.variables = variables
 
         self.model = Model("Optimización de Turnos de Retenes")
-
-        # Variables de decisión:
-        self.d = {(r, d, t): self.model.addVar(vtype=GRB.BINARY, name=f"d_{r}_{d}_{t}")
-                  for r in range(self.num_retenes) for d in range(self.dias) for t in range(self.num_turnos)}
-
         self.model.update()
+        
         self._definir_restricciones()
         self._definir_funcion_objetivo()
 
@@ -68,4 +60,9 @@ class ShiftOptimizer:
                     cobertura = sum(self.d[r, d, t].x for r in range(self.num_retenes))
                     print(f"  Día {d}, Turno {t}: {cobertura:.1f} retenes")
         else:
-            print("❌ No se encontró una solución óptima.")
+            print("El modelo es infactible. Identificando restricciones problemáticas...")
+            self.model.computeIIS()
+            for c in self.model.getConstrs():
+                if c.IISConstr:  # Identifica restricciones en IIS
+                    print(f"Restricción en IIS: {c.constrName}")
+
