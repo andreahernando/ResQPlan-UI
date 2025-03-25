@@ -1,68 +1,101 @@
 from gurobipy import Model, GRB, quicksum
+import gurobipy as gp
+import os
+import json
+from openai import OpenAI
 
 
 class ShiftOptimizer:
     def __init__(self, variables: dict):
-        """
-        Modelo parametrizado de optimización de turnos de retenes.
-        """
         self.variables = variables
+        self.model = Model("Optimizador General de Turnos")
 
-        self.model = Model("Optimización de Turnos de Retenes")
+        # Local scope para exec
+        local_scope = {
+            "model": self.model,
+            "GRB": GRB,
+            "quicksum": quicksum,
+            "gp": gp,
+        }
+
+        # Cargar variables dinámicamente
+        for var_name, value in variables["variables"].items():
+            # Convertir strings numéricos a enteros si es posible
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                pass  # Es lista, dict, etc.
+            setattr(self, var_name, value)
+            local_scope[var_name] = value
+
+        # Ejecutar definición de variables de decisión usando el mismo diccionario para globals y locals
+        code = variables["decision_variables"].replace("self.model", "model").replace("self.", "")
+        exec(code, local_scope)
+
+        # Almacenar la variable de decisión principal (esperamos que sea 'x' o 'd')
+        self.decision_vars = local_scope.get("x") or local_scope.get("d")
+
         self.model.update()
-        
-        self._definir_restricciones()
-        self._definir_funcion_objetivo()
 
-    def _definir_restricciones(self):
-        """
-        Define las restricciones del modelo:
-        - Cobertura mínima y máxima por turno
-        """
-        for d in range(self.dias):
-            for t in range(self.num_turnos):
-                expr = quicksum(self.d[r, d, t] for r in range(self.num_retenes))
-                self.model.addConstr(expr >= self.min_retenes, name=f"min_turno{t}_dia_{d}")
-                self.model.addConstr(expr <= self.max_retenes, name=f"max_turno{t}_dia_{d}")
+    def obtener_contexto_ejecucion(self):
+        """Construye un diccionario de contexto dinámico a partir de las variables definidas."""
+        contexto = {
+            "model": self.model,
+            "quicksum": quicksum,
+            "gp": gp,
+        }
+        # Incluir todas las variables definidas en el diccionario original
+        for var_name in self.variables["variables"]:
+            contexto[var_name] = getattr(self, var_name)
+        # Añadir la variable de decisión según se haya definido ('x' o 'd')
+        if "x =" in self.variables["decision_variables"]:
+            contexto["x"] = self.decision_vars
+        elif "d =" in self.variables["decision_variables"]:
+            contexto["d"] = self.decision_vars
 
-    def _definir_funcion_objetivo(self):
-        """
-        Minimiza la varianza de la carga de trabajo entre retenes.
-        """
-        carga_trabajo = {r: self.model.addVar(vtype=GRB.CONTINUOUS, name=f"carga_{r}")
-                         for r in range(self.num_retenes)}
+        # Asigna siempre el alias 'd_vars' para evitar conflictos en restricciones generadas
+        contexto["d_vars"] = self.decision_vars
 
-        # Calcular la carga de trabajo total de cada retén
-        for r in range(self.num_retenes):
+        return contexto
+
+    def agregar_restriccion(self, codigo_restriccion: str):
+        """Agrega una restricción al modelo a partir de código Gurobi."""
+        contexto = self.obtener_contexto_ejecucion()
+        exec(codigo_restriccion, contexto)
+
+    def definir_funcion_objetivo_balanceo(self, tipo_entidad="entidades", nombre_var="x"):
+        """
+        Minimiza la varianza de carga entre entidades (por ejemplo, profesores, retenes).
+        Se adapta al nombre de la variable de decisión y entidades.
+        """
+        entidades = getattr(self, f"num_{tipo_entidad}", None)
+        periodos = getattr(self, "dias", getattr(self, "num_periodos", None))
+        slots = getattr(self, "num_franjas", getattr(self, "num_slots", None))
+
+        if not all([entidades, periodos, slots]):
+            print("⚠️ No se pueden aplicar balanceo: faltan dimensiones.")
+            return
+
+        carga = {e: self.model.addVar(vtype=GRB.CONTINUOUS, name=f"carga_{e}") for e in range(entidades)}
+
+        for e in range(entidades):
             self.model.addConstr(
-                carga_trabajo[r] == quicksum(self.d[r, d, t] for d in range(self.dias) for t in range(self.num_turnos)),
-                name=f"calculo_carga_trabajo_{r}"
+                carga[e] == quicksum(self.decision_vars[e, p, s] for p in range(periodos) for s in range(slots)),
+                name=f"carga_total_{e}"
             )
 
-        # Calcular la carga promedio
-        carga_promedio = quicksum(carga_trabajo[r] for r in range(self.num_retenes)) / self.num_retenes
-
-        # Minimizar la suma de las desviaciones cuadráticas (varianza)
-        varianza = quicksum((carga_trabajo[r] - carga_promedio) * (carga_trabajo[r] - carga_promedio)
-                            for r in range(self.num_retenes))
-
+        carga_media = quicksum(carga[e] for e in range(entidades)) / entidades
+        varianza = quicksum((carga[e] - carga_media) ** 2 for e in range(entidades))
         self.model.setObjective(varianza, GRB.MINIMIZE)
 
     def optimizar(self):
-        """Ejecuta la optimización y muestra los resultados."""
         self.model.optimize()
 
         if self.model.status == GRB.OPTIMAL:
-            print("✅ Solución óptima encontrada")
-            print("Cobertura diaria (suma de aportes por turno):")
-            for d in range(self.dias):
-                for t in range(self.num_turnos):
-                    cobertura = sum(self.d[r, d, t].x for r in range(self.num_retenes))
-                    print(f"  Día {d}, Turno {t}: {cobertura:.1f} retenes")
+            print("\n✅ Solución óptima encontrada")
         else:
-            print("El modelo es infactible. Identificando restricciones problemáticas...")
+            print("\n❌ No se encontró una solución óptima.")
             self.model.computeIIS()
             for c in self.model.getConstrs():
-                if c.IISConstr:  # Identifica restricciones en IIS
-                    print(f"Restricción en IIS: {c.constrName}")
-
+                if c.IISConstr:
+                    print(f"🔍 Restricción conflictiva: {c.constrName}")

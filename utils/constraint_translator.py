@@ -63,6 +63,12 @@ def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
         "NO agregues explicaciones, comentarios ni bloques de código adicionales. "
         f"Las variables disponibles en este problema son:\n{variables_str}\n\n"
         "Usa ÚNICAMENTE estas variables en tu respuesta.\n"
+        "Recuerda que las variables de decisión se han definido utilizando el alias 'd_vars' y se han creado con la notación d_vars[(r, d, t)], donde:\n"
+        "  - el primer índice (r) corresponde a la primera dimensión y toma valores de 0 hasta (cantidad - 1),\n"
+        "  - el segundo índice (d) corresponde a la segunda dimensión y toma valores de 0 hasta (cantidad - 1),\n"
+        "  - el tercer índice (t) corresponde a la tercera dimensión y toma valores de 0 hasta (cantidad - 1).\n"
+        "Genera el código usando exactamente ese orden de índices, sin invertirlos ni sumar 1 a los rangos.\n"
+        "No uses gp.quicksum solo quicksum.\n"
         "Devuelve SOLO el código válido sin formato Markdown ni explicaciones.\n\n"
         f"Restricción: {nl_constraint}"
     )
