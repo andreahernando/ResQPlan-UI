@@ -28,7 +28,7 @@ if __name__ == "__main__":
         print("Restricción generada:")
         print(gurobi_code)
         # Ejecutar el código de la restricción en el contexto adecuado
-        model.agregar_restriccion(gurobi_code)
+        model.agregar_restriccion(nl_constraint, gurobi_code)
 
     # Ejecutar la optimización
     print("Ejecutando optimización...")

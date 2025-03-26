@@ -3,12 +3,15 @@ import gurobipy as gp
 import os
 import json
 from openai import OpenAI
-
+import config  # Importa la configuración común
+from utils.constraint_translator import translate_constraint_to_code  # Asegúrate de tener el import
 
 class ShiftOptimizer:
     def __init__(self, variables: dict):
         self.variables = variables
         self.model = Model("Optimizador General de Turnos")
+        # Diccionario para almacenar la descripción en lenguaje natural de cada restricción (mapeo: nombre -> descripción)
+        self.constraint_descriptions = {}
 
         # Local scope para exec
         local_scope = {
@@ -20,21 +23,32 @@ class ShiftOptimizer:
 
         # Cargar variables dinámicamente
         for var_name, value in variables["variables"].items():
-            # Convertir strings numéricos a enteros si es posible
             try:
                 value = int(value)
             except (ValueError, TypeError):
-                pass  # Es lista, dict, etc.
+                pass  # Puede ser lista, dict, etc.
             setattr(self, var_name, value)
             local_scope[var_name] = value
 
         # Ejecutar definición de variables de decisión usando el mismo diccionario para globals y locals
         code = variables["decision_variables"].replace("self.model", "model").replace("self.", "")
-        exec(code, local_scope)
 
-        # Almacenar la variable de decisión principal (esperamos que sea 'x' o 'd')
+        # Intentamos compilar y ejecutar el código de decisión con reintentos si falla
+        max_attempts = config.MAX_ATTEMPTS
+        attempt = 0
+        while attempt < max_attempts:
+            try:
+                compiled_code = compile(code, "<string>", "exec")
+                exec(compiled_code, local_scope)
+                break  # Si se ejecuta correctamente, salimos del bucle
+            except Exception as e:
+                attempt += 1
+                print(f"Attempt {attempt} to compile decision_variables code failed: {e}. Retrying...")
+        else:
+            raise RuntimeError("Failed to compile decision_variables code after multiple attempts.")
+
+        # Almacenar la variable de decisión principal (se espera que sea 'x' o 'd')
         self.decision_vars = local_scope.get("x") or local_scope.get("d")
-
         self.model.update()
 
     def obtener_contexto_ejecucion(self):
@@ -44,24 +58,52 @@ class ShiftOptimizer:
             "quicksum": quicksum,
             "gp": gp,
         }
-        # Incluir todas las variables definidas en el diccionario original
         for var_name in self.variables["variables"]:
             contexto[var_name] = getattr(self, var_name)
-        # Añadir la variable de decisión según se haya definido ('x' o 'd')
         if "x =" in self.variables["decision_variables"]:
             contexto["x"] = self.decision_vars
         elif "d =" in self.variables["decision_variables"]:
             contexto["d"] = self.decision_vars
-
-        # Asigna siempre el alias 'd_vars' para evitar conflictos en restricciones generadas
+        # Se asigna siempre el alias 'd_vars' para evitar conflictos en restricciones generadas
         contexto["d_vars"] = self.decision_vars
-
         return contexto
 
-    def agregar_restriccion(self, codigo_restriccion: str):
-        """Agrega una restricción al modelo a partir de código Gurobi."""
+    def agregar_restriccion(self, nl_constraint: str, codigo_restriccion: str, max_attempts=config.MAX_ATTEMPTS):
+        """
+        Agrega una restricción al modelo a partir de código Gurobi.
+        Si ocurre un error en tiempo de ejecución (por discrepancias de variables),
+        vuelve a llamar a translate_constraint_to_code para re-traducir la restricción,
+        incluyendo el mensaje de error completo, y reintenta la ejecución hasta un máximo de intentos.
+        Si se alcanza el máximo, retorna False para indicar que no se pudo agregar la restricción.
+        """
         contexto = self.obtener_contexto_ejecucion()
-        exec(codigo_restriccion, contexto)
+        attempt = 0
+        last_codigo = codigo_restriccion  # Guardamos el código original
+        while attempt < max_attempts:
+            print(f"Intentando agregar restricción, intento {attempt + 1}/{max_attempts}...")
+            try:
+                exec(last_codigo, contexto)
+                # Tras ejecutar, identificamos las restricciones nuevas agregadas:
+                nuevas_constr = [c for c in self.model.getConstrs() if c.constrName not in self.constraint_descriptions]
+                for c in nuevas_constr:
+                    self.constraint_descriptions[c.constrName] = nl_constraint
+                print("Restricción agregada correctamente.")
+                print("Código de restricción aceptado:")
+                print(last_codigo)
+                return True
+            except Exception as e:
+                attempt += 1
+                error_str = str(e)
+                print(f"Error al ejecutar la restricción (Intento {attempt}/{max_attempts}): {error_str}")
+                # Se modifica el prompt incluyendo el error completo para que el modelo intente corregir la restricción
+                nl_constraint_mod = (
+                    nl_constraint
+                    + "\nEl error completo es: " + error_str
+                    + "\nCorrige la restricción para que funcione correctamente."
+                )
+                last_codigo = translate_constraint_to_code(nl_constraint_mod, self.variables["variables"])
+        print("No se pudo agregar la restricción después de varios intentos. Por favor, ingresa otra restricción.")
+        return False
 
     def definir_funcion_objetivo_balanceo(self, tipo_entidad="entidades", nombre_var="x"):
         """
@@ -90,7 +132,6 @@ class ShiftOptimizer:
 
     def optimizar(self):
         self.model.optimize()
-
         if self.model.status == GRB.OPTIMAL:
             print("\n✅ Solución óptima encontrada")
         else:
@@ -98,4 +139,5 @@ class ShiftOptimizer:
             self.model.computeIIS()
             for c in self.model.getConstrs():
                 if c.IISConstr:
-                    print(f"🔍 Restricción conflictiva: {c.constrName}")
+                    nl = self.constraint_descriptions.get(c.constrName, "Descripción no disponible")
+                    print(f"🔍 Restricción conflictiva: {c.constrName}.\nDescripción en lenguaje natural: {nl}")

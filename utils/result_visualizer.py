@@ -39,6 +39,15 @@ def exportar_resultados(model, decision_vars, variables, archivo_salida=None):
             shift_labels = {i: params["horarios"][i] for i in range(len(params["horarios"]))}
         else:
             shift_labels = {i: f"Franja {i}" for i in range(num_shifts)}
+    elif "num_franjas" in params:
+        if isinstance(params["num_franjas"], list):
+            num_shifts = len(params["num_franjas"])
+        else:
+            num_shifts = int(params["num_franjas"])
+        if isinstance(params.get("horarios"), list):
+            shift_labels = {i: params["horarios"][i] for i in range(len(params["horarios"]))}
+        else:
+            shift_labels = {i: f"Franja {i}" for i in range(num_shifts)}
     else:
         num_shifts = 0
         shift_labels = {}

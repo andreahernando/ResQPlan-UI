@@ -1,6 +1,8 @@
 import os
 import json
 from openai import OpenAI
+import config
+import time
 
 def extract_variables_from_context(context: str) -> dict:
     """
@@ -41,13 +43,12 @@ def extract_variables_from_context(context: str) -> dict:
         raise RuntimeError(f"Error extracting variables: {e}")
 
 
-
 def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
     """
     Convierte una restricción en lenguaje natural a código Python compatible con Gurobi,
     usando las variables extraídas previamente.
+    Implementa un mecanismo de reintentos en caso de que el código generado sea inválido.
     """
-
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("The environment variable OPENAI_API_KEY is not set.")
@@ -73,14 +74,24 @@ def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
         f"Restricción: {nl_constraint}"
     )
 
-    try:
-        response = client.chat.completions.create(
-            model="o3-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
+    max_attempts = config.MAX_ATTEMPTS  # Usamos la constante definida en config.py
+    attempt = 0
+    while attempt < max_attempts:
+        try:
+            response = client.chat.completions.create(
+                model="o3-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            raw_output = response.choices[0].message.content.strip()
 
-        raw_output = response.choices[0].message.content.strip()
-        return raw_output
+            # Validación básica: intentar compilar el código para ver si es sintácticamente correcto.
+            compile(raw_output, "<string>", "exec")
 
-    except Exception as e:
-        raise RuntimeError(f"Error translating constraint: {e}")
+            # Si compila sin errores, retornamos el código.
+            return raw_output
+        except Exception as e:
+            attempt += 1
+            print(f"Attempt {attempt} failed with error: {e}. Retrying...")
+            time.sleep(1)  # Pequeña pausa antes del siguiente intento
+
+    raise RuntimeError("Failed to translate the constraint after multiple attempts.")
