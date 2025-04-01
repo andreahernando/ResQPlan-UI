@@ -1,23 +1,29 @@
 import os
 import json
-from openai import OpenAI
-import config
 import time
+import config
+from openai import OpenAI
 
-def extract_variables_from_context(context: str) -> dict:
-    """
-    Extrae variables clave y genera las variables de decisión en formato Gurobi.
-    """
+def get_openai_client():
+    """Inicializa y devuelve un cliente OpenAI."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("The environment variable OPENAI_API_KEY is not set.")
+        raise ValueError("⚠️ La variable de entorno OPENAI_API_KEY no está configurada.")
+    return OpenAI(api_key=api_key)
 
-    client = OpenAI(api_key=api_key)
+def extract_variables_from_context(context: str) -> dict:
+    """Extrae variables clave y genera las variables de decisión en formato Gurobi."""
+
+    client = get_openai_client()
 
     prompt = (
         "A partir de la siguiente descripción de un problema de planificación de turnos, "
         "extrae las variables clave necesarias para definir el modelo matemático. "
-        "Además, genera las variables de decisión en código Python usando Gurobi. "
+        "Identifica correctamente la entidad principal del problema (por ejemplo, retenes en un caso de emergencias, "
+        "o asignaturas en un caso de horarios escolares). "
+        "Asegúrate de que las variables de decisión usen esa entidad como primera clave en la estructura del diccionario. "
+        "Además, genera las variables de decisión en código Python usando Gurobi con el siguiente formato: "
+        "self.x = {(entidad, d, t): self.model.addVar(...)} donde 'entidad' siempre debe ser el elemento principal del problema. "
         "Devuelve la respuesta ÚNICAMENTE en formato JSON sin explicaciones. "
         "Ejemplo de salida:\n"
         '{\n  "variables": {\n    "num_retenes": 22,\n    "dias": 7,\n    "num_turnos": 2,\n    "horarios": ["08:00-20:00", "20:00-08:00"]\n  },\n'
@@ -30,39 +36,27 @@ def extract_variables_from_context(context: str) -> dict:
             model="o3-mini",
             messages=[{"role": "user", "content": prompt}]
         )
-        extracted_data = response.choices[0].message.content.strip()
+        return json.loads(response.choices[0].message.content.strip())
 
-        # Convertir JSON a diccionario de manera segura
-        result = json.loads(extracted_data)
-
-        return result  # Devuelve tanto variables como el código de variables de decisión
-
-    except json.JSONDecodeError as json_err:
-        raise RuntimeError(f"Error parsing JSON response: {json_err}\nResponse received: {extracted_data}")
+    except json.JSONDecodeError as err:
+        raise RuntimeError(f"❌ Error al analizar la respuesta JSON: {err}")
     except Exception as e:
-        raise RuntimeError(f"Error extracting variables: {e}")
+        raise RuntimeError(f"❌ Error al extraer variables: {e}")
 
 
 def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
-    """
-    Convierte una restricción en lenguaje natural a código Python compatible con Gurobi,
-    usando las variables extraídas previamente.
-    Implementa un mecanismo de reintentos en caso de que el código generado sea inválido.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("The environment variable OPENAI_API_KEY is not set.")
+    """Traduce una restricción en lenguaje natural a código Python válido para Gurobi."""
 
-    client = OpenAI(api_key=api_key)
-
-    # Convertimos las variables en un formato comprensible para el prompt
-    variables_str = json.dumps(variables, indent=2)
+    client = get_openai_client()
 
     prompt = (
         "Eres un experto en optimización con Gurobi. "
         "Convierte la siguiente restricción en código Python usando model.addConstr(...). "
+        "Si la restricción tiene una condición del tipo lb <= expr <= ub, "
+        "descomponla en dos restricciones separadas para que Gurobi las acepte correctamente: "
+        "model.addConstr(expr >= lb) y model.addConstr(expr <= ub). "
         "NO agregues explicaciones, comentarios ni bloques de código adicionales. "
-        f"Las variables disponibles en este problema son:\n{variables_str}\n\n"
+        f"Las variables disponibles en este problema son:\n{json.dumps(variables, indent=2)}\n\n"
         "Usa ÚNICAMENTE estas variables en tu respuesta.\n"
         "Recuerda que las variables de decisión se han definido utilizando el alias 'd_vars' y se han creado con la notación d_vars[(r, d, t)], donde:\n"
         "  - el primer índice (r) corresponde a la primera dimensión y toma valores de 0 hasta (cantidad - 1),\n"
@@ -74,24 +68,20 @@ def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
         f"Restricción: {nl_constraint}"
     )
 
-    max_attempts = config.MAX_ATTEMPTS  # Usamos la constante definida en config.py
-    attempt = 0
-    while attempt < max_attempts:
+    for attempt in range(config.MAX_ATTEMPTS):
         try:
             response = client.chat.completions.create(
                 model="o3-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
-            raw_output = response.choices[0].message.content.strip()
+            code = response.choices[0].message.content.strip()
 
-            # Validación básica: intentar compilar el código para ver si es sintácticamente correcto.
-            compile(raw_output, "<string>", "exec")
+            # Verificar sintaxis antes de devolverlo
+            compile(code, "<string>", "exec")
+            return code
 
-            # Si compila sin errores, retornamos el código.
-            return raw_output
         except Exception as e:
-            attempt += 1
-            print(f"Attempt {attempt} failed with error: {e}. Retrying...")
-            time.sleep(1)  # Pequeña pausa antes del siguiente intento
+            print(f"⚠️ Intento {attempt + 1} fallido: {e}. Reintentando...")
+            time.sleep(1)
 
-    raise RuntimeError("Failed to translate the constraint after multiple attempts.")
+    raise RuntimeError("❌ No se pudo traducir la restricción después de varios intentos.")

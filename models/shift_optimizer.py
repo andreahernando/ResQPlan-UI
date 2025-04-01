@@ -1,10 +1,7 @@
 from gurobipy import Model, GRB, quicksum
 import gurobipy as gp
-import os
-import json
-from openai import OpenAI
-import config  # Importa la configuración común
-from utils.constraint_translator import translate_constraint_to_code  # Asegúrate de tener el import
+import config
+from utils.constraint_translator import translate_constraint_to_code
 
 class ShiftOptimizer:
     def __init__(self, variables: dict):
@@ -131,6 +128,7 @@ class ShiftOptimizer:
         self.model.setObjective(varianza, GRB.MINIMIZE)
 
     def optimizar(self):
+        self.model.setParam("TimeLimit", 30)
         self.model.optimize()
         if self.model.status == GRB.OPTIMAL:
             print("\n✅ Solución óptima encontrada")

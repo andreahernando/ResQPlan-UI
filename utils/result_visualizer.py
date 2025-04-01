@@ -6,20 +6,22 @@ def exportar_resultados(model, decision_vars, variables, archivo_salida=None):
     """
     Exporta la solución del modelo a un archivo Excel con dos hojas:
       1. "Detalle": Lista detallada de asignaciones (por entidad, día y turno).
-      2. "Resumen": Cuadrícula de horario (filas: días, columnas: entidades),
+      2. "Resumen": Cuadrícula de horario (filas: turnos, columnas: días),
          donde se agregan las asignaciones en caso de duplicados.
 
-    La función es genérica y se adapta a los parámetros ingresados en el problema,
-    usando las etiquetas definidas (por ejemplo, "nombre_entidad", "nombres_dias").
+    La función es genérica y se adapta a los parámetros ingresados en el problema, usando las etiquetas definidas
+    (por ejemplo, "nombre_entidad", "nombres_dias").
     """
+
+    # Set default output file name if not provided
     if archivo_salida is None:
         archivo_salida = os.path.join(os.getcwd(), "resultados_turnos.xlsx")
 
-    # Extraer parámetros desde el diccionario
+    # Extract parameters from the dictionary
     params = variables["variables"]
     dias = int(params.get("dias", 0))
 
-    # Determinar el número de turnos (usando 'num_turnos' o 'franjas')
+    # Determine number of shifts (using 'num_turnos' or 'franjas')
     if "num_turnos" in params:
         num_shifts = int(params["num_turnos"])
         if isinstance(params.get("horarios"), list):
@@ -52,21 +54,22 @@ def exportar_resultados(model, decision_vars, variables, archivo_salida=None):
         num_shifts = 0
         shift_labels = {}
 
-    # Determinar el número de entidades a partir de decision_vars (suponiendo claves (e, d, t))
+    # Determine number of entities from decision_vars (assuming keys (e, d, t))
     if decision_vars:
         num_entities = max(key[0] for key in decision_vars.keys()) + 1
     else:
         num_entities = 0
-    # Usar el nombre definido en las variables o un valor por defecto
+
+    # Use entity name defined in variables or default value
     entity_label = params.get("nombre_entidad", "Entidad")
 
-    # Definir nombres de días: si se provee una lista en "nombres_dias", usarla; de lo contrario, generar valores por defecto.
+    # Define day names: use "nombres_dias" if provided, else generate default values
     if "nombres_dias" in params and isinstance(params["nombres_dias"], list):
         day_labels = {i: params["nombres_dias"][i] for i in range(len(params["nombres_dias"]))}
     else:
         day_labels = {i: f"Día {i + 1}" for i in range(dias)}
 
-    # Construir la lista detallada de asignaciones usando la solución óptima
+    # Build detailed list of assignments using the optimal solution
     detalle = {entity_label: [], "Día": [], "Turno": []}
     count = 0
     for e in range(num_entities):
@@ -81,18 +84,41 @@ def exportar_resultados(model, decision_vars, variables, archivo_salida=None):
 
     df_detalle = pd.DataFrame(detalle)
 
-    # Crear una tabla pivotada para el resumen. Usamos pivot_table para manejar duplicados.
+    # Create a pivoted table for the schedule summary
     if not df_detalle.empty:
-        df_resumen = df_detalle.pivot_table(index="Día", columns=entity_label, values="Turno",
-                                            aggfunc=lambda x: " / ".join(x))
+        df_resumen = df_detalle.pivot_table(index="Turno", columns="Día", values=entity_label,
+                                            aggfunc=lambda x: " / ".join(map(str, x)))
         df_resumen.fillna("Descanso", inplace=True)
     else:
         df_resumen = pd.DataFrame()
 
-    # Exportar a Excel con dos hojas: "Detalle" y "Resumen"
+    # Export to Excel with two sheets: "Detalle" and "Resumen"
     with pd.ExcelWriter(archivo_salida, engine="xlsxwriter") as writer:
         df_detalle.to_excel(writer, sheet_name="Detalle", index=False)
-        if not df_resumen.empty:
-            df_resumen.to_excel(writer, sheet_name="Resumen")
+        df_resumen.to_excel(writer, sheet_name="Resumen")
+
+        workbook = writer.book
+        header_format = workbook.add_format({"bold": True, "bg_color": "#D9EAD3", "border": 1})
+        cell_format = workbook.add_format({"border": 1})
+        descanso_format = workbook.add_format({"bg_color": "#F4CCCC", "border": 1})
+
+        worksheet_detalle = writer.sheets["Detalle"]
+        for col_num, value in enumerate(df_detalle.columns.values):
+            worksheet_detalle.write(0, col_num, value, header_format)
+            worksheet_detalle.set_column(col_num, col_num, 20)
+
+        worksheet_resumen = writer.sheets["Resumen"]
+        for col_num, value in enumerate(df_resumen.columns.values):
+            worksheet_resumen.write(0, col_num + 1, value, header_format)
+            worksheet_resumen.set_column(col_num + 1, col_num + 1, 20)
+
+        for row_num, value in enumerate(df_resumen.index.values):
+            worksheet_resumen.write(row_num + 1, 0, value, header_format)
+
+        for row in range(df_resumen.shape[0]):
+            for col in range(df_resumen.shape[1]):
+                cell_value = df_resumen.iloc[row, col]
+                format_to_apply = cell_format if cell_value != "Descanso" else descanso_format
+                worksheet_resumen.write(row + 1, col + 1, cell_value, format_to_apply)
 
     print(f"\n✅ Resultados exportados correctamente a {archivo_salida}")
