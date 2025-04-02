@@ -3,11 +3,11 @@ import gurobipy as gp
 import config
 from utils.constraint_translator import translate_constraint_to_code
 
+
 class ShiftOptimizer:
     def __init__(self, variables: dict):
         self.variables = variables
         self.model = Model("Optimizador General de Turnos")
-        # Diccionario para almacenar la descripción en lenguaje natural de cada restricción (mapeo: nombre -> descripción)
         self.constraint_descriptions = {}
 
         # Local scope para exec
@@ -69,7 +69,7 @@ class ShiftOptimizer:
         """
         Agrega una restricción al modelo a partir de código Gurobi.
         Si ocurre un error en tiempo de ejecución (por discrepancias de variables),
-        vuelve a llamar a translate_constraint_to_code para re-traducir la restricción,
+        vuelve a llamar a translate_constraint_to_code para retraducir la restricción,
         incluyendo el mensaje de error completo, y reintenta la ejecución hasta un máximo de intentos.
         Si se alcanza el máximo, retorna False para indicar que no se pudo agregar la restricción.
         """

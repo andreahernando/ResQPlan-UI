@@ -4,12 +4,14 @@ import time
 import config
 from openai import OpenAI
 
+
 def get_openai_client():
     """Inicializa y devuelve un cliente OpenAI."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("⚠️ La variable de entorno OPENAI_API_KEY no está configurada.")
     return OpenAI(api_key=api_key)
+
 
 def extract_variables_from_context(context: str) -> dict:
     """Extrae variables clave y genera las variables de decisión en formato Gurobi."""

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResQPlan - Optimización de Turnos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+        }
+        textarea {
+            width: 80%;
+            height: 100px;
+            padding: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            resize: vertical;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+            display: none;
+            white-space: pre-wrap;
+            width: 80%;
+            margin: 10px auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>ResQPlan - Optimización de Turnos</h1>
+
+    <label for="context">Ingresa el contexto del problema:</label><br>
+    <textarea id="context" placeholder="Describe el problema aquí..."></textarea><br>
+    <button id="ok-button">Extraer Variables</button>
+    <div id="result" class="result-box"></div>
+
+    <br>
+    <label for="constraint">Ingresa una restricción:</label><br>
+    <textarea id="constraint" placeholder="Escribe la restricción aquí..."></textarea><br>
+    <button id="convert-button">Convertir Restricción</button>
+    <div id="constraint-result" class="result-box"></div>
+
+    <br>
+    <button id="optimize-button">Ejecutar Optimización</button>
+    <div id="optimize-result" class="result-box"></div>
+
+    <script>
+        document.getElementById('ok-button').addEventListener('click', function() {
+            const context = document.getElementById('context').value.trim();
+            if (!context) {
+                alert("Por favor ingresa algún contexto.");
+                return;
+            }
+
+            fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_data: context })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerText = "Variables extraídas:\n" + JSON.stringify(data.result, null, 2);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('result').innerText = "Error al contactar con la API.";
+            });
+        });
+
+        document.getElementById('convert-button').addEventListener('click', function() {
+            const constraint = document.getElementById('constraint').value.trim();
+            if (!constraint) {
+                alert("Por favor ingresa una restricción.");
+                return;
+            }
+
+            fetch('/api/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ constraint: constraint })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultDiv = document.getElementById('constraint-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerText = "Restricción convertida:\n" + data.result;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('constraint-result').innerText = "Error al contactar con la API.";
+            });
+        });
+
+        document.getElementById('optimize-button').addEventListener('click', function() {
+            fetch('/api/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultDiv = document.getElementById('optimize-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerText = "Resultado de la optimización:\n" + JSON.stringify(data.solution, null, 2);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('optimize-result').innerText = "Error al contactar con la API.";
+            });
+        });
+    </script>
+</body>
+</html>
