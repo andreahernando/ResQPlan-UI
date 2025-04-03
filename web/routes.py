@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, session
+from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for
 from utils.constraint_translator import extract_variables_from_context, translate_constraint_to_code
 from models.shift_optimizer import ShiftOptimizer
 import gurobipy as gp
@@ -13,6 +13,12 @@ global_model = None  # Variable global para almacenar el modelo
 def index():
     return render_template('index.html')
 
+@routes.route('/restricciones')
+def restricciones():
+    """ Página donde se configuran y editan las restricciones. """
+    variables = session.get('variables', {})  # Recuperar variables de la sesión
+    return render_template('restricciones.html', variables=variables)
+
 @routes.route('/api/translate', methods=['POST'])
 def translate():
     global global_model
@@ -24,16 +30,13 @@ def translate():
 
     variables = extract_variables_from_context(context)
 
-    # 🛠️ Depuración: imprime variables antes de guardarlas
-    print("Variables extraídas:", variables)
-
     # Guardar en la sesión
     session['variables'] = variables
 
     global_model = ShiftOptimizer(variables)
 
-    return jsonify({"result": variables})
-
+    # Redirigir a la página de restricciones después de procesar el contexto
+    return jsonify({"result": variables, "redirect": url_for('routes.restricciones')})
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():
@@ -44,16 +47,13 @@ def convert():
     if not nl_constraint:
         return jsonify({"error": "No constraint provided"}), 400
 
-    # Recuperar variables de la sesión
     variables = session.get('variables', {})
 
     if not variables:
         return jsonify({"error": "No variables found in session. Translate context first."}), 400
 
-    # Traducir restricción con OpenAI
     translated_code = translate_constraint_to_code(nl_constraint, variables["variables"])
 
-    # Agregar la restricción al modelo
     global global_model
     if global_model:
         global_model.agregar_restriccion(nl_constraint, translated_code)
@@ -76,11 +76,9 @@ def optimize():
 
     variables = session.get('variables', {})
 
-    # ⚠️ Verifica que 'variables' existe antes de acceder a él
     if "variables" not in variables:
         return jsonify({"error": "Variables not found in session. Ensure you translated the context first."}), 400
 
     exportar_resultados(global_model.model, global_model.decision_vars, variables)
 
     return jsonify({"solution": solution})
-

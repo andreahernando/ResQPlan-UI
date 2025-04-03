@@ -4,10 +4,14 @@ body {
     margin: 0;
     padding: 0;
     background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 /* Encabezado */
 .main-header {
+    width: 100%;
     background-color: #007bff;
     color: white;
     padding: 10px 20px;
@@ -21,314 +25,178 @@ body {
     font-size: 24px;
 }
 
+/* Panel superior para contexto */
+.context-panel {
+    width: 80%;
+    max-width: 700px;
+    min-height: 300px;
+    background-color: #dfeffc;
+    border-radius: 8px;
+    padding: 35px;
+    margin-top: 60px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.context-panel textarea {
+    width: 100%;
+    height: 180px;
+    padding: 10px;
+    border: 1px solid #bcd3eb;
+    border-radius: 5px;
+    resize: vertical;
+    font-size: 16px;
+}
+
 /* Contenedor principal */
 .container {
     display: flex;
     justify-content: space-around;
+    width: 80%;
+    margin-top: 20px;
     padding: 20px;
 }
 
-/* Paneles */
+/* Paneles de restricciones */
 .panel {
     background-color: #e9f1f9;
     border: 1px solid #bcd3eb;
     border-radius: 5px;
-    padding: 30px;
-    width: 40%;
-    height: 500px;
+    padding: 20px;
+    width: 45%;
+    height: 400px;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     align-items: center;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 textarea {
     width: 100%;
-    height: 250px;
-    border: 1px solid #bcd3eb;
+    height: 150px;
+    padding: 8px;
+    font-size: 16px;
+    margin-bottom: 10px;
     border-radius: 5px;
-    padding: 10px;
-    font-size: 14px;
+    border: 1px solid #bcd3eb;
     resize: none;
-    flex-grow: 1;
-    margin-bottom: 20px;
 }
 
+/* Lista de restricciones */
 .restricciones-list {
-    max-height: 300px;
-    overflow-y: auto;  /* Habilita el scroll vertical */
+    width: 100%;
+    max-height: 250px;
+    overflow-y: auto;
     padding: 10px;
     border: 1px solid #ccc;
-    border-radius: 5px;
     background-color: #f9f9f9;
-}
-.restricciones-list:empty {
-    display: none; /* Oculta la lista si está vacía */
-}
-.restriccion {
-    background-color: white;
-    border: 1px solid #bcd3eb;
     border-radius: 5px;
-    padding: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 5px;
 }
 
-.restriccion .btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.restriccion .btn-group {
-    display: flex;
-    gap: 5px;
-}
-
-/* Botones */
-.buttons,
-.restricciones-list + .btn {
-    display: flex;
-    justify-content: space-between;
-    width: auto;
-    padding: 8px 16px; /* Tamaño del botón */
-    align-self: flex-end;
-    margin-top: 10px;
-}
-
-.btn {
+/* Botón */
+button, .btn {
     background-color: #007bff;
     color: white;
     border: none;
-    border-radius: 5px;
-    padding: 10px;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.btn-group {
-    display: flex;
-    gap: 10px;
-    justify-content: space-between;
-    margin-top: 10px;
-}
-
-.btn:hover {
-    background-color: #0056b3;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-}
-
-.btn.upload {
-    margin-right: 10px;
-}
-
-/* Tooltip */
-.btn[data-tooltip] {
-    position: relative; /* Importante para posicionar el tooltip */
-}
-
-.btn[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #333;
-    color: #fff;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
-    z-index: 10; /* Asegúrate de que esté por encima de otros elementos */
-}
-
-.btn[data-tooltip]:hover::after {
-    opacity: 1;
-}
-
-/* Notificaciones */
-.notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-    color: white;
+    padding: 10px 15px;
     font-size: 16px;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s ease-in-out;
-    z-index: 1000;
-}
-
-/* Tipo de notificación */
-.notification.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.notification.success {
-    background-color: #28a745;
-}
-
-.notification.error {
-    background-color: #dc3545;
-}
-
-.notification.warning {
-    background-color: #ffc107;
-    color: #212529; /* Texto más oscuro para amarillo */
-}
-
-/* Icono */
-.notification .icon {
-    font-size: 20px;
-}
-
-
-
-@keyframes fadeOut {
-    0% {
-        opacity: 1;
-    }
-    80% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0;
-    }
-}
-
-.edit-input {
-    width: calc(100% - 50px); /* Ajusta según el diseño */
-    padding: 5px;
-    border: 1px solid #bcd3eb;
     border-radius: 5px;
-    font-size: 14px;
-    box-sizing: border-box;
+    cursor: pointer;
+    margin: 5px;
 }
 
-/* Modal */
-/* Estilos para el modal */
-.modal {
+button:hover, .btn:hover {
+    background-color: #0056b3;
+}
+
+/* Contenedor de botones alineado a la derecha */
+.button-container {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: auto;
+}
+
+#ok-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    font-size: 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    display: block;
+    margin-left: auto;
+}
+
+#ok-button:hover {
+    background-color: #0056b3;
+}
+
+/* Caja de resultados */
+.result-box {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    font-size: 16px;
+    display: none;
+    white-space: pre-wrap;
+    width: 80%;
+    text-align: left;
+    margin: 10px auto;
+}
+
+/* Pantalla de carga */
+.loading-overlay {
     display: none; /* Oculto por defecto */
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Fondo semi-transparente */
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 1000; /* Asegura que está sobre otros elementos */
+    z-index: 1000;
 }
 
-.modal-content {
-    background-color: #ffffff;
+.loading-content {
+    background: white;
+    padding: 20px;
     border-radius: 10px;
-    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.3);
-    width: 500px;
-    max-width: 90%;
-    padding: 0; /* Sin padding global */
-    position: relative; /* Para posicionar el botón de cerrar */
-    display: flex;
-    flex-direction: column;
-}
-
-.modal-content h2 {
-    background-color: #85c1e9; /* Azul claro */
-    color: #333; /* Texto oscuro */
-    margin: 0;
-    padding: 15px;
     text-align: center;
-    font-size: 1.5em;
-    border-radius: 10px 10px 0 0; /* Bordes redondeados en la parte superior */
-    position: relative; /* Para usar pseudo-elementos */
-    z-index: 1; /* Asegura que el texto esté encima de la línea */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-/* Línea azul oscuro debajo del encabezado */
-.modal-content h2::after {
-    content: ""; /* Pseudo-elemento vacío */
-    position: absolute;
-    bottom: 0; /* Colocado en la parte inferior del encabezado */
-    left: 0;
-    width: 100%;
-    height: 4px; /* Grosor de la línea */
-    background-color: #007bff; /* Azul más oscuro */
-    border-radius: 0 0 5px 5px; /* Redondear esquinas para consistencia */
-    z-index: 0; /* Asegura que la línea esté detrás del texto */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 5px solid #007bff;
+    border-top: 5px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: block;
+    margin: 0 auto;
 }
 
-/* Botón de cierre del modal */
-.modal-content .close-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: none;
-    border: none;
-    font-size: 1.2em;
-    cursor: pointer;
-    z-index: 2; /* Asegura que esté encima del encabezado y la línea */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
+/* Responsividad para pantallas pequeñas */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        align-items: center;
+    }
 
-.modal-body {
-    margin: 20px; /* Espaciado interno */
-    padding: 15px;
-    background-color: #f4f4f4; /* Fondo gris claro */
-    border-radius: 8px;
-    color: #333; /* Texto oscuro */
-    font-size: 1em;
-    text-align: center; /* Centramos el texto */
-    border: 1px solid #ddd; /* Borde sutil */
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: space-around; /* Espacio entre botones */
-    padding: 15px;
-    background-color: #f9f9f9; /* Fondo claro */
-    border-top: 1px solid #ddd; /* Borde superior */
-    border-radius: 0 0 10px 10px; /* Bordes redondeados en la parte inferior */
-}
-
-.modal-footer .btn {
-    background-color: #85c1e9; /* Azul claro */
-    color: #fff; /* Texto blanco */
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 1em;
-    transition: background-color 0.3s ease;
-}
-
-.modal-footer .btn:hover {
-    background-color: #5dade2; /* Azul más oscuro al pasar el mouse */
-}
-
-.close-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 1.5em;
-    cursor: pointer;
-    color: #666;
-    transition: color 0.3s ease;
-}
-
-.close-btn:hover {
-    color: #000; /* Más oscuro al pasar el mouse */
+    .panel {
+        width: 90%;
+        margin-bottom: 20px;
+    }
 }

@@ -3,7 +3,7 @@ from flask import Flask
 from web.routes import routes  # Importamos las rutas desde routes.py
 
 # Inicializamos la aplicación Flask
-app = Flask(__name__)
+app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
 app.secret_key = "una_clave_secreta_segura"
 
 # Registramos las rutas que definimos en el archivo routes.py

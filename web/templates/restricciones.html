@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResQPlan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header class="main-header">
+        <h1>ResQPlan</h1>
+    </header>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Ingresar Restricciones</h2>
+            <textarea id="constraint" placeholder="Ejemplo: Ningún bombero puede trabajar más de 40 horas semanales..."></textarea>
+
+            <!-- Contenedor para alinear el botón a la derecha -->
+            <div class="button-container">
+                <button id="convert-button">Convertir a código</button>
+            </div>
+
+            <div id="constraint-result" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Restricciones Añadidas</h2>
+            <div class="restricciones-list"></div>
+
+            <!-- Contenedor para alinear el botón a la derecha -->
+            <div class="button-container">
+                <button id="optimize-button">Optimizar</button>
+            </div>
+
+            <div id="optimization-result" class="result-box" style="display:none;"></div>
+        </div>
+
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
