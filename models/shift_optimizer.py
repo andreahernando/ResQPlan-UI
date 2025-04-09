@@ -40,9 +40,9 @@ class ShiftOptimizer:
                 break  # Si se ejecuta correctamente, salimos del bucle
             except Exception as e:
                 attempt += 1
-                print(f"Attempt {attempt} to compile decision_variables code failed: {e}. Retrying...")
+                print(f"Intento {attempt} de compilar el código de 'decision_variables' fallido: {e}. Reintentando...")
         else:
-            raise RuntimeError("Failed to compile decision_variables code after multiple attempts.")
+            raise RuntimeError("No se pudo compilar el código de 'decision_variables' después de múltiples intentos.")
 
         # Almacenar la variable de decisión principal (se espera que sea 'x' o 'd')
         self.decision_vars = local_scope.get("x") or local_scope.get("d")
@@ -129,7 +129,10 @@ class ShiftOptimizer:
 
     def optimizar(self):
         self.model.setParam("TimeLimit", 30)
+        #self.model.setParam("Seed", 42)  # 🔒 Hace que la solución sea reproducible
+        self.model.setParam("MIPFocus", 1)
         self.model.optimize()
+
 
         if self.model.status == GRB.OPTIMAL:
             print("\n✅ Solución óptima encontrada")

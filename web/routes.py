@@ -1,8 +1,9 @@
-from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for
+from flask import Blueprint, jsonify, request, render_template, session, url_for, send_file
 from utils.constraint_translator import extract_variables_from_context, translate_constraint_to_code
 from models.shift_optimizer import ShiftOptimizer
 import gurobipy as gp
 from utils.result_visualizer import exportar_resultados
+import os
 
 # Crear un Blueprint para las rutas
 routes = Blueprint('routes', __name__, template_folder='../web/templates')
@@ -26,7 +27,7 @@ def translate():
     context = data.get('input_data')
 
     if not context:
-        return jsonify({"error": "No input data provided"}), 400
+        return jsonify({"error": "No se proporcionaron datos de entrada"}), 400
 
     variables = extract_variables_from_context(context)
 
@@ -45,12 +46,12 @@ def convert():
     nl_constraint = data.get('constraint')
 
     if not nl_constraint:
-        return jsonify({"error": "No constraint provided"}), 400
+        return jsonify({"error": "No se proporcionó ninguna restricción"}), 400
 
     variables = session.get('variables', {})
 
     if not variables:
-        return jsonify({"error": "No variables found in session. Translate context first."}), 400
+        return jsonify({"error": "No se encontraron variables en la sesión. Traduce primero el contexto."}), 400
 
     translated_code = translate_constraint_to_code(nl_constraint, variables["variables"])
 
@@ -65,7 +66,7 @@ def optimize():
     global global_model
 
     if not global_model:
-        return jsonify({"error": "No model found. Provide context and constraints first."}), 400
+        return jsonify({"error": "No se encontró ningún modelo. Proporciona primero el contexto y las restricciones."}), 400
 
     global_model.optimizar()
 
@@ -77,8 +78,17 @@ def optimize():
     variables = session.get('variables', {})
 
     if "variables" not in variables:
-        return jsonify({"error": "Variables not found in session. Ensure you translated the context first."}), 400
+        return jsonify({"error": "No se encontraron variables en la sesión. Asegúrate de haber traducido el contexto primero."}), 400
 
     exportar_resultados(global_model.model, global_model.decision_vars, variables)
 
     return jsonify({"solution": solution})
+
+@routes.route('/api/download_excel')
+def download_excel():
+    excel_path = os.path.join(os.getcwd(), 'resultados_turnos.xlsx')
+
+    if os.path.exists(excel_path):
+        return send_file(excel_path, as_attachment=True)
+    else:
+        return jsonify({"error": "Archivo no encontrado"}), 404
