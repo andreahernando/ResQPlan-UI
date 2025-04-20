@@ -57,6 +57,8 @@ def translate_constraint_to_code(nl_constraint: str, variables: dict) -> str:
         "Si la restricción tiene una condición del tipo lb <= expr <= ub, "
         "descomponla en dos restricciones separadas para que Gurobi las acepte correctamente: "
         "model.addConstr(expr >= lb) y model.addConstr(expr <= ub). "
+        "Incluye un argumento 'name=' en cada restricción, generando un nombre identificativo y descriptivo "
+        "a partir de la restricción original (en inglés o snake_case si es largo). "
         "NO agregues explicaciones, comentarios ni bloques de código adicionales. "
         f"Las variables disponibles en este problema son:\n{json.dumps(variables, indent=2)}\n\n"
         "Usa ÚNICAMENTE estas variables en tu respuesta.\n"
