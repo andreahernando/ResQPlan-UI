@@ -6,7 +6,6 @@ from utils.constraint_translator import translate_constraint_to_code
 
 class ShiftOptimizer:
     def __init__(self, variables: dict):
-        #gp.disposeDefaultEnv()  # 🔄 Reinicia el entorno de Gurobi
         self.variables = variables
         self.model = Model("Optimizador General de Turnos")
         self.constraint_descriptions = {}

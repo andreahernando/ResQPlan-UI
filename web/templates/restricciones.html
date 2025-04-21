@@ -18,7 +18,7 @@
 
             <!-- Contenedor para alinear el botón a la derecha -->
             <div class="button-container">
-                <button id="convert-button">Añadir restricción</button>
+                <button id="convert-button">Añadir</button>
             </div>
 
             <div id="constraint-result" class="result-box" style="display:none;"></div>
@@ -35,6 +35,14 @@
         </div>
 
     </div>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <span class="spinner"></span>
+            <p>Buscando solución...</p>
+        </div>
+    </div>
+
     <div id="resultado-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn">&times;</span>

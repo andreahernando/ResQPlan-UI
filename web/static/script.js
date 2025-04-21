@@ -79,52 +79,69 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const convertButton = document.getElementById('convert-button');
+
     if (convertButton) {
-        convertButton.addEventListener('click', function () {
-        const constraint = document.getElementById('constraint').value.trim();
-        if (!constraint) {
-            showNotification("warning", "Por favor ingresa una restricción.");
-            return;
-        }
+        convertButton.addEventListener('click', async function () {
+            const constraintInput = document.getElementById('constraint');
+            const rawConstraints = constraintInput.value.trim();
 
-        async function intentarConvertir(constraint, intentos = 3) {
-            try {
-                const response = await fetch('/api/convert', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ constraint })
-                });
+            if (!rawConstraints) {
+                showNotification("warning", "Por favor ingresa al menos una restricción.");
+                return;
+            }
 
-                if (!response.ok) {
-                    throw new Error("Error en la respuesta del servidor");
-                }
+            constraintInput.value = "";
+            constraintInput.focus();
 
-                const data = await response.json();
+            // Separar por líneas, eliminar vacías y espacios
+            const constraints = rawConstraints.split('\n').map(c => c.trim()).filter(c => c);
 
-                // Solo si fue exitoso, la añadimos
-                const lista = document.querySelector('.restricciones-list');
-                const item = document.createElement('p');
-                item.innerText = constraint;
-                lista.appendChild(item);
+            procesandoRestricciones = true;
 
-                showNotification("success", "Restricción añadida correctamente.");
-            } catch (error) {
-                if (intentos > 1) {
-                    console.warn(`Intento fallido. Reintentando... (${4 - intentos}º intento fallido)`);
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // espera 1 segundo antes de reintentar
-                    intentarConvertir(constraint, intentos - 1);
-                } else {
-                    console.error("Fallo tras varios intentos:", error);
-                    showNotification("error", "No se pudo añadir la restricción. Revisa el contexto o inténtalo de nuevo.");
-                    document.getElementById('constraint-result').innerText = "Error al contactar con la API.";
-                }
+            // Procesar una por una con await
+            for (const constraint of constraints) {
+                await intentarConvertir(constraint);
+            }
+
+            procesandoRestricciones = false;
+        });
+    }
+
+    // Función para enviar cada restricción a la API y manejar reintentos
+    async function intentarConvertir(constraint, intentos = 3) {
+        try {
+            const response = await fetch('/api/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ constraint })
+            });
+
+            if (!response.ok) {
+                throw new Error("Error en la respuesta del servidor");
+            }
+
+            const data = await response.json();
+
+            // Mostrar la restricción original (puedes mostrar también el resultado si quieres)
+            const lista = document.querySelector('.restricciones-list');
+            const item = document.createElement('p');
+            item.innerText = constraint;
+            lista.appendChild(item);
+
+            showNotification("success", "Restricción añadida correctamente.");
+        } catch (error) {
+            if (intentos > 1) {
+                console.warn(`Intento fallido. Reintentando... (${4 - intentos}º intento fallido)`);
+                await new Promise(resolve => setTimeout(resolve, 1000)); // espera 1 segundo antes de reintentar
+                return intentarConvertir(constraint, intentos - 1);
+            } else {
+                console.error("Fallo tras varios intentos:", error);
+                showNotification("error", "No se pudo añadir la restricción. Revisa el contexto o inténtalo de nuevo.");
+                document.getElementById('constraint-result').innerText = "Error al contactar con la API.";
             }
         }
-
-        intentarConvertir(constraint);
-});
-
     }
+
 
     // Modal de resultados
     const resultadoModal = document.getElementById("resultado-modal");
@@ -169,11 +186,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const optimizeButton = document.getElementById('optimize-button');
     if (optimizeButton) {
         optimizeButton.addEventListener('click', function () {
+            if (procesandoRestricciones) {
+                showNotification("warning", "Espera a que se terminen de procesar las restricciones antes de optimizar.");
+                return;
+            }
             const restricciones = document.querySelector('.restricciones-list').children;
             if (restricciones.length === 0) {
                 showNotification("warning", "Por favor ingresa al menos una restricción antes de optimizar.");
                 return;
             }
+
+            mostrarPantallaCarga()
 
             fetch('/api/optimize', {
                 method: 'POST',
@@ -181,6 +204,8 @@ document.addEventListener("DOMContentLoaded", function () {
             })
             .then(response => response.json())
             .then(data => {
+                loadingOverlay.style.display = "none"; //Ocultar spinner
+
                 showResultadoModal();
                 const resultDiv = document.getElementById('optimization-result');
                 resultDiv.style.display = 'block';
