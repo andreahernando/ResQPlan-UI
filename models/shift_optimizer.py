@@ -1,180 +1,164 @@
-from gurobipy import Model, GRB, quicksum
+from gurobipy import Model, GRB, quicksum, tupledict
 import gurobipy as gp
 import config
 from utils.constraint_translator import translate_constraint_to_code
+import pprint
 
 
 class ShiftOptimizer:
-    def __init__(self, variables: dict):
-        self.variables = variables
-        self.model = Model("Optimizador General de Turnos")
+    # ───────────────────────────────────────── constructor ────────────────
+    def __init__(self, specs: dict):
+        self.specs = specs
+        self.model = Model("General Shift Optimizer")
         self.constraint_descriptions = {}
 
-        # Local scope para exec
-        local_scope = {
+        # ---- contexto exec ----
+        self.exec_context = {
             "model": self.model,
             "GRB": GRB,
             "quicksum": quicksum,
             "gp": gp,
+            "specs": specs,
+            "data": specs,
+            "variables": specs.get("variables", {}),
+            "resources": specs.get("resources", {}),
         }
+        for k, v in specs.get("variables", {}).items():
+            self.exec_context[k] = v
+            setattr(self, k, v)
 
-        # Cargar variables dinámicamente
-        for var_name, value in variables["variables"].items():
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
-                pass  # Puede ser lista, dict, etc.
-            setattr(self, var_name, value)
-            local_scope[var_name] = value
+        # ---- mostrar decision_variables bruto ----
+        print("\n📝 Bloque decision_variables recibido:\n")
+        print(specs["decision_variables"])
+        print("-" * 80)
 
-        # Ejecutar definición de variables de decisión usando el mismo diccionario para globals y locals
-        code = variables["decision_variables"].replace("self.model", "model").replace("self.", "")
+        # ---- ejecutar bloque ----
+        code = specs["decision_variables"].replace("\\n", "\n") \
+                                          .replace("self.model", "model") \
+                                          .replace("self.", "")
+        code = code.replace("model.GRB.", "GRB.").replace("self.GRB.", "GRB.")
+        exec(compile(code, "<decision_variables>", "exec"), self.exec_context)
 
-        # Intentamos compilar y ejecutar el código de decisión con reintentos si falla
-        max_attempts = config.MAX_ATTEMPTS
-        attempt = 0
-        while attempt < max_attempts:
-            try:
-                compiled_code = compile(code, "<string>", "exec")
-                exec(compiled_code, local_scope)
-                break  # Si se ejecuta correctamente, salimos del bucle
-            except Exception as e:
-                attempt += 1
-                print(f"Intento {attempt} de compilar el código de 'decision_variables' fallido: {e}. Reintentando...")
-        else:
-            raise RuntimeError("No se pudo compilar el código de 'decision_variables' después de múltiples intentos.")
+        # ---- detectar contenedor de vars ----
+        self.decision_vars = self.exec_context.get("x")
+        if self.decision_vars is None:
+            for v in self.exec_context.values():
+                if isinstance(v, (dict, tupledict)):
+                    self.decision_vars = v
+                    break
+        if self.decision_vars is None:
+            raise RuntimeError("Decision vars not found in exec_context")
 
-        # Detectar cualquier dict con claves tipo (int, int, int)
-        for name, val in local_scope.items():
-            if isinstance(val, dict) and all(isinstance(k, tuple) and len(k) == 3 for k in val.keys()):
-                self.decision_vars = val
-                break
-
+        self.exec_context["x"] = self.decision_vars
         self.model.update()
 
-    def obtener_contexto_ejecucion(self):
-        """Construye un diccionario de contexto dinámico a partir de las variables definidas."""
-        contexto = {
-            "model": self.model,
-            "quicksum": quicksum,
-            "gp": gp,
-        }
-        for var_name in self.variables["variables"]:
-            contexto[var_name] = getattr(self, var_name)
-        if "x =" in self.variables["decision_variables"]:
-            contexto["x"] = self.decision_vars
-        elif "d =" in self.variables["decision_variables"]:
-            contexto["d"] = self.decision_vars
-        # Se asigna siempre el alias 'd_vars' para evitar conflictos en restricciones generadas
-        contexto["d_vars"] = self.decision_vars
-        return contexto
+        # ---- print resumen genérico ----
+        print("\nℹ️  variables extraídas:")
+        pprint.pprint(specs.get("variables", {}), width=100)
+        print(f"\n✅ contenedor vars: {type(self.decision_vars).__name__} con {len(self.decision_vars)} índices\n")
 
-    def agregar_restriccion(self, nl_constraint: str, codigo_restriccion: str, max_attempts=config.MAX_ATTEMPTS):
-        """
-        Agrega una restricción al modelo a partir de código Gurobi.
-        Si ocurre un error en tiempo de ejecución (por discrepancias de variables),
-        vuelve a llamar a translate_constraint_to_code para retraducir la restricción,
-        incluyendo el mensaje de error completo, y reintenta la ejecución hasta un máximo de intentos.
-        Si se alcanza el máximo, retorna False para indicar que no se pudo agregar la restricción.
-        """
-        contexto = self.obtener_contexto_ejecucion()
-        attempt = 0
-        last_codigo = codigo_restriccion  # Guardamos el código original
+    # ───────────────────────────────── agregar restricción ────────────────
+    def agregar_restriccion(self, nl: str, code: str, max_attempts=config.MAX_ATTEMPTS):
+        attempt, current = 0, code
         while attempt < max_attempts:
-            print(f"Intentando agregar restricción, intento {attempt + 1}/{max_attempts}...")
+            print("\n🛠️  Código Gurobi generado para la restricción:\n")
+            print(current)
+            print("-" * 60)
             try:
-                exec(last_codigo, contexto)
-                # Tras ejecutar, identificamos las restricciones nuevas agregadas:
-                nuevas_constr = [c for c in self.model.getConstrs() if c.constrName not in self.constraint_descriptions]
-                for c in nuevas_constr:
-                    self.constraint_descriptions[c.constrName] = nl_constraint
-                print("Restricción agregada correctamente.")
-                print("Código de restricción aceptado:")
-                print(last_codigo)
+                exec(current, self.exec_context)
+                # registrar descripción si es nueva
+                for c in self.model.getConstrs():
+                    if c.constrName not in self.constraint_descriptions:
+                        self.constraint_descriptions[c.constrName] = nl
+                print("✔️  restricción añadida correctamente")
                 return True
             except Exception as e:
                 attempt += 1
-                error_str = str(e)
-                print(f"Error al ejecutar la restricción (Intento {attempt}/{max_attempts}): {error_str}")
-                # Se modifica el prompt incluyendo el error completo para que el modelo intente corregir la restricción
-                nl_constraint_mod = (
-                    nl_constraint
-                    + "\nEl error completo es: " + error_str
-                    + "\nCorrige la restricción para que funcione correctamente."
-                )
-                last_codigo = translate_constraint_to_code(nl_constraint_mod, self.variables["variables"])
-        print("No se pudo agregar la restricción después de varios intentos. Por favor, ingresa otra restricción.")
+                print(f"⚠️  error al ejecutar (intento {attempt}/{max_attempts}): {e}")
+                nl_mod = f"{nl}\nError completo: {e}\nCorrige la restricción."
+                current = translate_constraint_to_code(nl_mod, self.specs)
+        print("✖️  no se pudo añadir la restricción tras varios intentos")
         return False
 
-    def definir_funcion_objetivo_balanceo(self, tipo_entidad="entidades", nombre_var="x"):
-        """
-        Minimiza la varianza de carga entre entidades (por ejemplo, profesores, retenes).
-        Se adapta al nombre de la variable de decisión y entidades.
-        """
-        entidades = getattr(self, f"num_{tipo_entidad}", None)
-        periodos = getattr(self, "dias", getattr(self, "num_periodos", None))
-        slots = getattr(self, "num_franjas", getattr(self, "num_slots", None))
-
-        if not all([entidades, periodos, slots]):
-            print("⚠️ No se pueden aplicar balanceo: faltan dimensiones.")
-            return
-
-        carga = {e: self.model.addVar(vtype=GRB.CONTINUOUS, name=f"carga_{e}") for e in range(entidades)}
-
-        for e in range(entidades):
-            self.model.addConstr(
-                carga[e] == quicksum(self.decision_vars[e, p, s] for p in range(periodos) for s in range(slots)),
-                name=f"carga_total_{e}"
-            )
-
-        carga_media = quicksum(carga[e] for e in range(entidades)) / entidades
-        varianza = quicksum((carga[e] - carga_media) ** 2 for e in range(entidades))
-        self.model.setObjective(varianza, GRB.MINIMIZE)
-
+    # ───────────────────────────────── optimizar ──────────────────────────
+    # ───────────────────────────────── optimizar ──────────────────────────
     def optimizar(self):
         self.model.setParam("Threads", 1)
         self.model.setParam("Presolve", 0)
-        self.model.setParam("MIPFocus", 2)
-
-        # 🔁 Activar el solution pool
-        self.model.setParam("PoolSearchMode", 2)
-        self.model.setParam("PoolSolutions", 10)
-
         self.model.optimize()
 
-        if self.model.status == GRB.OPTIMAL or self.model.status == GRB.SUBOPTIMAL:
-            print(f"\n✅ Se encontraron {self.model.SolCount} soluciones factibles.")
+        status = self.model.status
+        print("\n════════════════ RESULTADO OPTIMIZACIÓN ════════════════")
+        print(f"Estado Gurobi : {status} ({self.model.Status})")
 
-            # Aquí usamos solo la mejor (la activa por defecto)
-            print(f"\n🏆 Mejor solución encontrada (ObjVal = {self.model.ObjVal}):")
-            for key, var in self.decision_vars.items():
-                if var.X > 0.5:
-                    print(f"  {key} -> {var.X}")
-
+        # ------- caso óptimo / subóptimo -------
+        if status in (GRB.OPTIMAL, GRB.SUBOPTIMAL):
+            print(f"Valor objetivo: {self.model.ObjVal}\n")
+            print("Variables activadas (valor > 0.5):")
+            for k, v in self.decision_vars.items():
+                if v.X > 0.5:
+                    print(f"  {k} -> {v.X}")
+            print("════════════════════════════════════════════════════════")
             return
 
-        if self.model.status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
-            print("\n❌ El modelo es inviable. Analizando restricciones conflictivas...\n")
+        # ------- caso inviable -------
+        if status in (GRB.INFEASIBLE, GRB.INF_OR_UNBD):
+            print("❌ El modelo es inviable. Analizando IIS …")
             self.model.computeIIS()
             for c in self.model.getConstrs():
                 if c.IISConstr:
-                    nl = self.constraint_descriptions.get(c.constrName, "Descripción no disponible")
-                    print(f"🔍 Restricción conflictiva: {c.constrName}\n📝 Descripción: {nl}")
+                    desc = self.constraint_descriptions.get(c.constrName, "(sin descripción)")
+                    print(f"   ↯ {c.constrName}  —  {desc}")
 
-            print("\n⚠️ Intentando relajar las restricciones para encontrar una solución cercana...")
-            orignumvars = self.model.NumVars
-            self.model.feasRelaxS(relaxobjtype=0, minrelax=False, vrelax=False, crelax=True)
-
+            print("\n🔄 Intentando relajación automática de restricciones …")
+            original_vars = self.model.NumVars
+            # crea variables de holgura solo en las restricciones
+            self.model.feasRelaxS(relaxobjtype=0, minrelax=False,
+                                  vrelax=False, crelax=True)
             self.model.optimize()
+
             if self.model.status == GRB.OPTIMAL:
-                print("\n🔄 Modelo relajado resuelto con éxito.")
-                print(f"📉 Objetivo (relajado): {self.model.ObjVal}")
-                print("\n📊 Restricciones relajadas (valores de slack):")
-                slacks = self.model.getVars()[orignumvars:]
+                print("✅ Modelo relajado resuelto.")
+                print(f"Valor objetivo (relajado): {self.model.ObjVal}")
+                # mostrar qué restricciones se relajaron realmente
+                slacks = self.model.getVars()[original_vars:]
                 for sv in slacks:
                     if sv.X > 1e-6:
-                        print(f"🔧 {sv.VarName} = {sv.X:g}")
+                        print(f"   {sv.VarName} = {sv.X:g}")
             else:
-                print("❌ El modelo relajado tampoco pudo resolverse.")
+                print("❌ Ni siquiera el modelo relajado fue factible.")
         else:
-            print(f"\n⚠️ Optimización detenida. Estado: {self.model.status}")
+            print("⚠️  Optimización detenida. Estado:", status)
+
+        print("════════════════════════════════════════════════════════")
+
+    def _imprimir_decision_vars(self):
+        """Imprime cada x activa describiendo sus índices según las listas presentes en 'variables'."""
+        act = [(k, v.X) for k, v in self.decision_vars.items() if v.X > 0.5]
+        if not act:
+            print("No hay variables activadas.")
+            return
+
+        vars_dict = self.specs.get("variables", {})
+        # construir un mapa valor → nombre_lista  para identificación rápida
+        reverse_map = {}
+        for nombre_lista, lista in vars_dict.items():
+            if nombre_lista.startswith("lista_") and isinstance(lista, list):
+                for item in lista:
+                    reverse_map[item] = nombre_lista
+
+        horarios = vars_dict.get("horarios", [])
+        dias_tot = vars_dict.get("dias", 0)
+
+        print(f"Decisiones activas: {len(act)}")
+        for key, _ in act:
+            *entidades, dia_idx, franja_idx = key
+            partes = []
+            for item in entidades:
+                tipo = reverse_map.get(item, "??")
+                partes.append(f"{item}({tipo})")
+            # tiempo:
+            dia_hum = dia_idx + 1
+            turno   = horarios[franja_idx] if franja_idx < len(horarios) else f"franja {franja_idx}"
+            print(" · ".join(partes) + f"  →  día {dia_hum}, {turno}")
+
