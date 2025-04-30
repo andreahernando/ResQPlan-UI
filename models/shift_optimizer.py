@@ -39,23 +39,25 @@ class ShiftOptimizer:
         code = code.replace("model.GRB.", "GRB.").replace("self.GRB.", "GRB.")
         exec(compile(code, "<decision_variables>", "exec"), self.exec_context)
 
-        # ---- detectar contenedor de vars ----
-        self.decision_vars = self.exec_context.get("x")
-        if self.decision_vars is None:
-            for v in self.exec_context.values():
-                if isinstance(v, (dict, tupledict)):
-                    self.decision_vars = v
-                    break
-        if self.decision_vars is None:
-            raise RuntimeError("Decision vars not found in exec_context")
+        # ---- detectar contenedores de decision_vars ----
+        self.decision_vars = {}
 
-        self.exec_context["x"] = self.decision_vars
+        for k, v in self.exec_context.items():
+            if k.startswith("x_") and isinstance(v, (dict, tupledict)):
+                setattr(self, k, v)  # self.x_retenes = {...}, etc.
+                self.decision_vars.update(v)
+
+        if not self.decision_vars:
+            raise RuntimeError("No se encontraron variables de decisión con prefijo x_ en exec_context")
+
+        self.exec_context["x"] = self.decision_vars  # acceso genérico si se usa 'x'
         self.model.update()
 
         # ---- print resumen genérico ----
         print("\nℹ️  variables extraídas:")
         pprint.pprint(specs.get("variables", {}), width=100)
         print(f"\n✅ contenedor vars: {type(self.decision_vars).__name__} con {len(self.decision_vars)} índices\n")
+        print(self.decision_vars)
 
     # ───────────────────────────────── agregar restricción ────────────────
     def agregar_restriccion(self, nl: str, code: str, max_attempts=config.MAX_ATTEMPTS):
@@ -95,9 +97,11 @@ class ShiftOptimizer:
         if status in (GRB.OPTIMAL, GRB.SUBOPTIMAL):
             print(f"Valor objetivo: {self.model.ObjVal}\n")
             print("Variables activadas (valor > 0.5):")
-            for k, v in self.decision_vars.items():
-                if v.X > 0.5:
-                    print(f"  {k} -> {v.X}")
+            for key, var in self.decision_vars.items():
+                # var es un gurobipy.Var, var.X su valor numérico
+                if var.X > 0.5:
+                    print(f"{key} -> {var.X}")
+
             print("════════════════════════════════════════════════════════")
             return
 
@@ -161,4 +165,3 @@ class ShiftOptimizer:
             dia_hum = dia_idx + 1
             turno   = horarios[franja_idx] if franja_idx < len(horarios) else f"franja {franja_idx}"
             print(" · ".join(partes) + f"  →  día {dia_hum}, {turno}")
-
