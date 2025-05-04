@@ -219,13 +219,15 @@ button:hover, .btn:hover {
     background-color: #ffffff;
     border-radius: 10px;
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.3);
-    padding: 0;
     max-width: 90%;
-    width: 500px;
+    width: 600px; /* o lo que prefieras */
+    max-height: 90vh; /* para que nunca sobrepase la pantalla */
+    overflow-y: auto; /* permite scroll si se necesita */
     position: relative;
     display: flex;
     flex-direction: column;
 }
+
 .modal-content h2 {
     background-color: #85c1e9; /* Azul claro */
     color: #333; /* Texto oscuro */
@@ -263,15 +265,17 @@ button:hover, .btn:hover {
 }
 
 .modal-body {
-    margin: 20px; /* Espaciado interno */
+    margin: 20px;
     padding: 15px;
-    background-color: #f4f4f4; /* Fondo gris claro */
+    background-color: #f4f4f4;
     border-radius: 8px;
-    color: #333; /* Texto oscuro */
+    color: #333;
     font-size: 1em;
-    text-align: center; /* Centramos el texto */
-    border: 1px solid #ddd; /* Borde sutil */
+    text-align: center;
+    border: 1px solid #ddd;
+    overflow-y: auto;
 }
+
 
 .modal-footer {
     display: flex;
@@ -371,4 +375,5 @@ button:hover, .btn:hover {
     border: 1px solid #ccc;
     padding: 10px;
 }
+
 

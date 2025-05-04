@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const contextInput = document.getElementById('context');
     const loadingOverlay = document.getElementById('loading-overlay');
 
-    // Función para mostrar notificaciones
     function showNotification(type, message) {
         const notification = document.createElement('div');
         notification.classList.add('notification', 'show', type);
@@ -27,7 +26,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 3000);
     }
 
-    // Ocultar la pantalla de carga al iniciar
     if (loadingOverlay) loadingOverlay.style.display = "none";
 
     function mostrarPantallaCarga() {
@@ -49,20 +47,16 @@ document.addEventListener("DOMContentLoaded", function () {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ input_data: context })
         })
-        .then(response => response.json())
-        .then(data => {
-            sessionStorage.setItem("variables", JSON.stringify(data.result));
-            window.location.href = "/restricciones";
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification("error", "Error al contactar con la API.");
-            sessionStorage.setItem("cargando", "error");
-        });
-
-        //setTimeout(() => {
-        //    window.location.href = "/restricciones";
-        //}, 5000);
+            .then(response => response.json())
+            .then(data => {
+                sessionStorage.setItem("variables", JSON.stringify(data.result));
+                window.location.href = "/restricciones";
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification("error", "Error al contactar con la API.");
+                sessionStorage.setItem("cargando", "error");
+            });
     }
 
     if (okButton) {
@@ -93,12 +87,10 @@ document.addEventListener("DOMContentLoaded", function () {
             constraintInput.value = "";
             constraintInput.focus();
 
-            // Separar por líneas, eliminar vacías y espacios
             const constraints = rawConstraints.split('\n').map(c => c.trim()).filter(c => c);
 
             procesandoRestricciones = true;
 
-            // Procesar una por una con await
             for (const constraint of constraints) {
                 await intentarConvertir(constraint);
             }
@@ -107,7 +99,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Función para enviar cada restricción a la API y manejar reintentos
     async function intentarConvertir(constraint, intentos = 3) {
         try {
             const response = await fetch('/api/convert', {
@@ -122,7 +113,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const data = await response.json();
 
-            // Mostrar la restricción original (puedes mostrar también el resultado si quieres)
             const lista = document.querySelector('.restricciones-list');
             const item = document.createElement('p');
             item.innerText = constraint;
@@ -132,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (error) {
             if (intentos > 1) {
                 console.warn(`Intento fallido. Reintentando... (${4 - intentos}º intento fallido)`);
-                await new Promise(resolve => setTimeout(resolve, 1000)); // espera 1 segundo antes de reintentar
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 return intentarConvertir(constraint, intentos - 1);
             } else {
                 console.error("Fallo tras varios intentos:", error);
@@ -142,8 +132,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-
-    // Modal de resultados
     const resultadoModal = document.getElementById("resultado-modal");
     const resultadoContenido = document.getElementById("resultado-contenido");
     const closeResultadoBtn = resultadoModal?.querySelector(".close-btn");
@@ -171,17 +159,22 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Función para parsear la clave de solución y evitar que aparezcan "NA" en la visualización
     function parseKey(key) {
-        // Expresión regular que extrae tres números (empleado, día y turno) ignorando espacios y paréntesis
-        const regex = /\(?\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)?/;
+        // Este regex captura tres elementos separados por comas dentro de paréntesis
+        const regex = /\(\s*['"]?([^,'"]+)['"]?\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/;
         const match = key.match(regex);
+
         if (match) {
-            return [Number(match[1]), Number(match[2]), Number(match[3])];
+            const entidad = match[1];
+            const dia = parseInt(match[2], 10);
+            const franja = parseInt(match[3], 10);
+            return { entidad, dia, franja };
         } else {
-            return null; // Si la clave no se puede parsear, se ignora
+            return null;
         }
     }
+
+
 
     const optimizeButton = document.getElementById('optimize-button');
     if (optimizeButton) {
@@ -196,84 +189,84 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            mostrarPantallaCarga()
+            mostrarPantallaCarga();
 
             fetch('/api/optimize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
-            .then(response => response.json())
-            .then(data => {
-                loadingOverlay.style.display = "none"; //Ocultar spinner
+                .then(response => response.json())
+                .then(data => {
+                    loadingOverlay.style.display = "none";
+                    showResultadoModal();
 
-                showResultadoModal();
-                const resultDiv = document.getElementById('optimization-result');
-                resultDiv.style.display = 'block';
-                resultDiv.innerHTML = '';
-
-                if (typeof data.solution === 'object') {
-                    const resumen = {};
-
-                    for (const [key, value] of Object.entries(data.solution)) {
-                        if (value > 0.5) {
-                            const parsed = parseKey(key);
-                            if (!parsed) continue; // Ignorar claves mal formateadas
-                            const [e, d, t] = parsed;
-                            if (!resumen[t]) resumen[t] = {};
-                            if (!resumen[t][d]) resumen[t][d] = [];
-                            resumen[t][d].push(e);
-                        }
-                    }
-
-                    // ✅ CORREGIDO: determinar valores máximos seguros
-                    const turnos = Math.max(...Object.keys(resumen).map(Number), 0) + 1;
-                    const dias = Math.max(
-                        ...Object.values(resumen).flatMap(obj => Object.keys(obj).map(Number)),
-                        0
-                    ) + 1;
-
-                    // ✅ CORREGIDO: asegurar que resumen[t][d] siempre existe
-                    for (let t = 0; t < turnos; t++) {
-                        if (!resumen[t]) resumen[t] = {};
-                        for (let d = 0; d < dias; d++) {
-                            if (!resumen[t][d]) resumen[t][d] = [];
-                        }
-                    }
-
-                    const table = document.createElement('table');
-                    table.classList.add('resultado-grid');
-                    table.innerHTML = '<thead><tr><th>Turno \\ Día</th>' +
-                        Array.from({ length: dias }, (_, d) => `<th>Día ${d + 1}</th>`).join('') +
-                        '</tr></thead><tbody>';
-
-                    for (let t = 0; t < turnos; t++) {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `<td><b>Turno ${t}</b></td>`;
-
-                        for (let d = 0; d < dias; d++) {
-                            const entidades = resumen[t][d];
-                            const texto = entidades.length > 0 ? entidades.join(' / ') : 'Descanso';
-                            const color = texto === 'Descanso' ? '#f4cccc' : '#d9ead3';
-                            row.innerHTML += `<td style="background:${color};text-align:center">${texto}</td>`;
-                        }
-
-                        table.appendChild(row);
-                    }
-
-                    table.innerHTML += '</tbody>';
+                    const resultDiv = document.getElementById('optimization-result');
+                    resultDiv.style.display = 'block';
                     resultDiv.innerHTML = '';
-                    resultDiv.appendChild(table);
-                    showNotification("success", "Optimización completada.");
-                } else {
-                    resultDiv.innerText = data.solution;
-                    showNotification("success", "Resultado de la optimización disponible.");
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification("error", "Error al contactar con la API.");
-                document.getElementById('optimization-result').innerText = "Error al contactar con la API.";
-            });
+
+                    if (typeof data.solution === 'object') {
+                        const resumen = {};
+
+                        for (const [key, value] of Object.entries(data.solution)) {
+                            if (value > 0.5) {
+                                const parsed = parseKey(key);
+                                if (!parsed) continue;
+
+                                const { entidad, dia, franja } = parsed;
+
+                                if (!resumen[franja]) resumen[franja] = {};
+                                if (!resumen[franja][dia]) resumen[franja][dia] = [];
+
+                                resumen[franja][dia].push(entidad);
+
+                            }
+                        }
+
+                        const turnos = Math.max(...Object.keys(resumen).map(Number), 0) + 1;
+                        const dias = Math.max(
+                            ...Object.values(resumen).flatMap(obj => Object.keys(obj).map(Number)),
+                            0
+                        ) + 1;
+
+                        for (let t = 0; t < turnos; t++) {
+                            if (!resumen[t]) resumen[t] = {};
+                            for (let d = 0; d < dias; d++) {
+                                if (!resumen[t][d]) resumen[t][d] = [];
+                            }
+                        }
+
+                        const table = document.createElement('table');
+                        table.classList.add('resultado-grid');
+                        table.innerHTML = '<thead><tr><th>Turno \\ Día</th>' +
+                            Array.from({ length: dias }, (_, d) => `<th>Día ${d + 1}</th>`).join('') +
+                            '</tr></thead><tbody>';
+
+                        for (let t = 0; t < turnos; t++) {
+                            let row = `<tr><td><b>Turno ${t}</b></td>`;
+                            for (let d = 0; d < dias; d++) {
+                                const entidades = resumen[t][d];
+                                const texto = entidades.length > 0 ? entidades.join(' / ') : 'Descanso';
+                                const color = texto === 'Descanso' ? '#f4cccc' : '#d9ead3';
+                                row += `<td style="background:${color};text-align:center">${texto}</td>`;
+                            }
+                            row += '</tr>';
+                            table.innerHTML += row;
+                        }
+
+                        table.innerHTML += '</tbody>';
+                        resultDiv.innerHTML = '';
+                        resultDiv.appendChild(table);
+                        showNotification("success", "Optimización completada.");
+                    } else {
+                        resultDiv.innerText = data.solution;
+                        showNotification("success", "Resultado de la optimización disponible.");
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification("error", "Error al contactar con la API.");
+                    document.getElementById('optimization-result').innerText = "Error al contactar con la API.";
+                });
         });
     }
 
