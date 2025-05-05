@@ -160,10 +160,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function parseKey(key) {
-        // Este regex captura tres elementos separados por comas dentro de paréntesis
         const regex = /\(\s*['"]?([^,'"]+)['"]?\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/;
         const match = key.match(regex);
-
         if (match) {
             const entidad = match[1];
             const dia = parseInt(match[2], 10);
@@ -173,8 +171,6 @@ document.addEventListener("DOMContentLoaded", function () {
             return null;
         }
     }
-
-
 
     const optimizeButton = document.getElementById('optimize-button');
     if (optimizeButton) {
@@ -206,56 +202,66 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     if (typeof data.solution === 'object') {
                         const resumen = {};
+                        const trabajadores = new Set();
 
                         for (const [key, value] of Object.entries(data.solution)) {
                             if (value > 0.5) {
                                 const parsed = parseKey(key);
                                 if (!parsed) continue;
-
                                 const { entidad, dia, franja } = parsed;
+                                trabajadores.add(entidad);
 
                                 if (!resumen[franja]) resumen[franja] = {};
                                 if (!resumen[franja][dia]) resumen[franja][dia] = [];
-
                                 resumen[franja][dia].push(entidad);
-
                             }
                         }
 
                         const turnos = Math.max(...Object.keys(resumen).map(Number), 0) + 1;
-                        const dias = Math.max(
-                            ...Object.values(resumen).flatMap(obj => Object.keys(obj).map(Number)),
-                            0
-                        ) + 1;
+                        const dias = Math.max(...Object.values(resumen).flatMap(obj => Object.keys(obj).map(Number)), 0) + 1;
 
-                        for (let t = 0; t < turnos; t++) {
-                            if (!resumen[t]) resumen[t] = {};
-                            for (let d = 0; d < dias; d++) {
-                                if (!resumen[t][d]) resumen[t][d] = [];
+                        // Filtro por trabajador
+                        const filtroContainer = document.createElement('div');
+                        filtroContainer.innerHTML = `
+                            <label for="worker-filter">Filtrar por trabajador:</label>
+                            <select id="worker-filter">
+                                <option value="Todos">Todos</option>
+                                ${[...trabajadores].map(t => `<option value="${t}">${t}</option>`).join('')}
+                            </select><br><br>`;
+                        resultDiv.appendChild(filtroContainer);
+
+                        const tablaContainer = document.createElement('div');
+                        resultDiv.appendChild(tablaContainer);
+
+                        function renderTabla(filtro) {
+                            const table = document.createElement('table');
+                            table.classList.add('resultado-grid');
+                            table.innerHTML = '<thead><tr><th>Turno \\ Día</th>' +
+                                Array.from({ length: dias }, (_, d) => `<th>Día ${d + 1}</th>`).join('') +
+                                '</tr></thead><tbody>';
+
+                            for (let t = 0; t < turnos; t++) {
+                                let row = `<tr><td><b>Turno ${t}</b></td>`;
+                                for (let d = 0; d < dias; d++) {
+                                    const entidades = resumen[t]?.[d] || [];
+                                    const filtradas = filtro === 'Todos' ? entidades : entidades.filter(e => e === filtro);
+                                    const texto = filtradas.length > 0 ? filtradas.join(' / ') : 'Descanso';
+                                    const color = texto === 'Descanso' ? '#f4cccc' : '#d9ead3';
+                                    row += `<td style="background:${color};text-align:center">${texto}</td>`;
+                                }
+                                row += '</tr>';
+                                table.innerHTML += row;
                             }
+
+                            table.innerHTML += '</tbody>';
+                            tablaContainer.innerHTML = '';
+                            tablaContainer.appendChild(table);
                         }
 
-                        const table = document.createElement('table');
-                        table.classList.add('resultado-grid');
-                        table.innerHTML = '<thead><tr><th>Turno \\ Día</th>' +
-                            Array.from({ length: dias }, (_, d) => `<th>Día ${d + 1}</th>`).join('') +
-                            '</tr></thead><tbody>';
+                        const filtroSelect = filtroContainer.querySelector('#worker-filter');
+                        filtroSelect.addEventListener('change', () => renderTabla(filtroSelect.value));
+                        renderTabla('Todos');
 
-                        for (let t = 0; t < turnos; t++) {
-                            let row = `<tr><td><b>Turno ${t}</b></td>`;
-                            for (let d = 0; d < dias; d++) {
-                                const entidades = resumen[t][d];
-                                const texto = entidades.length > 0 ? entidades.join(' / ') : 'Descanso';
-                                const color = texto === 'Descanso' ? '#f4cccc' : '#d9ead3';
-                                row += `<td style="background:${color};text-align:center">${texto}</td>`;
-                            }
-                            row += '</tr>';
-                            table.innerHTML += row;
-                        }
-
-                        table.innerHTML += '</tbody>';
-                        resultDiv.innerHTML = '';
-                        resultDiv.appendChild(table);
                         showNotification("success", "Optimización completada.");
                     } else {
                         resultDiv.innerText = data.solution;
