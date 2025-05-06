@@ -41,7 +41,7 @@ def translate():
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():
-    """ Traduce una restricción en lenguaje natural a código Gurobi. """
+    """ Traduce una restricción en lenguaje natural a código Gurobi y la valida """
     data = request.get_json()
     nl_constraint = data.get('constraint')
 
@@ -55,34 +55,56 @@ def convert():
 
     translated_code = translate_constraint_to_code(nl_constraint, variables["variables"])
 
-    global global_model
+    valid = False
     if global_model:
-        global_model.agregar_restriccion(nl_constraint, translated_code)
+        valid = global_model.validar_restriccion(nl_constraint, translated_code)
 
-    return jsonify({"result": translated_code})
+    return jsonify({
+        "code": translated_code,
+        "valid": valid
+    })
 
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
-    global global_model
+    """
+    Aplica las restricciones activas marcadas en el frontend y lanza la optimización.
+    Se espera un JSON con 'active_constraints': ["NL1", "NL2", ...]
+    """
 
+    global global_model
     if not global_model:
         return jsonify({"error": "No se encontró ningún modelo. Proporciona primero el contexto y las restricciones."}), 400
 
+    data = request.get_json() or {}
+    active = data.get('active_constraints', [])
+
+    # Añadir solo las restricciones validadas y activas
+    added = []
+    failed = []
+    for nl in active:
+        if global_model.agregar_restriccion(nl):
+            added.append(nl)
+        else:
+            failed.append(nl)
+
+    # Optimizar el modelo
     global_model.optimizar()
 
+    # Preparar respuesta
     if global_model.model.status == gp.GRB.OPTIMAL:
         solution = {f"x{key}": var.X for key, var in global_model.decision_vars.items() if var.X > 0.5}
     else:
         solution = "No se encontró una solución óptima."
 
+        # Exportar resultados a Excel/lo que haga falta
     variables = session.get('variables', {})
-
-    if "variables" not in variables:
-        return jsonify({"error": "No se encontraron variables en la sesión. Asegúrate de haber traducido el contexto primero."}), 400
-
     exportar_resultados(global_model.model, global_model.decision_vars, variables)
 
-    return jsonify({"solution": solution})
+    return jsonify({
+        "added_constraints": added,
+        "failed_constraints": failed,
+        "solution": solution
+    })
 
 @routes.route('/api/download_excel')
 def download_excel():

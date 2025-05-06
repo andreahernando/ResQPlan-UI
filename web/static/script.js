@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
+    let procesandoRestricciones = false;
     const okButton = document.getElementById('ok-button');
     const contextInput = document.getElementById('context');
     const loadingOverlay = document.getElementById('loading-overlay');
@@ -114,9 +115,22 @@ document.addEventListener("DOMContentLoaded", function () {
             const data = await response.json();
 
             const lista = document.querySelector('.restricciones-list');
-            const item = document.createElement('p');
-            item.innerText = constraint;
-            lista.appendChild(item);
+            const li = document.createElement('li');
+            li.classList.add('restriccion-item');
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = true;               // por defecto activa
+            checkbox.classList.add('chk-rest');
+
+            const label = document.createElement('label');
+            label.textContent = constraint;
+            label.style.marginLeft = '8px';
+
+            li.appendChild(checkbox);
+            li.appendChild(label);
+            lista.appendChild(li);
+
 
             showNotification("success", "Restricción añadida correctamente.");
         } catch (error) {
@@ -187,10 +201,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
             mostrarPantallaCarga();
 
+            const items = document.querySelectorAll('.restriccion-item');
+            const activeConstraints = [];
+
+            items.forEach(li => {
+              const chk = li.querySelector('.chk-rest');
+              const texto = li.querySelector('label').innerText;
+              if (chk.checked) {
+                activeConstraints.push(texto);
+              }
+            });
+
+            // luego lo envías en el body:
             fetch('/api/optimize', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ active_constraints: activeConstraints })
             })
+
+
                 .then(response => response.json())
                 .then(data => {
                     loadingOverlay.style.display = "none";

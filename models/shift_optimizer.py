@@ -11,6 +11,7 @@ class ShiftOptimizer:
         self.specs = specs
         self.model = Model("General Shift Optimizer")
         self.constraint_descriptions = {}
+        self.restricciones_validadas = {}  # nl -> (code, activa)
 
         # ---- contexto exec ----
         self.exec_context = {
@@ -60,27 +61,26 @@ class ShiftOptimizer:
         print(self.decision_vars)
 
     # ───────────────────────────────── agregar restricción ────────────────
-    def agregar_restriccion(self, nl: str, code: str, max_attempts=config.MAX_ATTEMPTS):
-        attempt, current = 0, code
-        while attempt < max_attempts:
-            print("\n🛠️  Código Gurobi generado para la restricción:\n")
-            print(current)
-            print("-" * 60)
-            try:
-                exec(current, self.exec_context)
-                # registrar descripción si es nueva
-                for c in self.model.getConstrs():
-                    if c.constrName not in self.constraint_descriptions:
-                        self.constraint_descriptions[c.constrName] = nl
-                print("✔️  restricción añadida correctamente")
-                return True
-            except Exception as e:
-                attempt += 1
-                print(f"⚠️  error al ejecutar (intento {attempt}/{max_attempts}): {e}")
-                nl_mod = f"{nl}\nError completo: {e}\nCorrige la restricción."
-                current = translate_constraint_to_code(nl_mod, self.specs)
-        print("✖️  no se pudo añadir la restricción tras varios intentos")
-        return False
+    def agregar_restriccion(self, nl: str):
+        restric = self.restricciones_validadas.get(nl)
+        if not restric:
+            print("⚠️  Restricción no validada previamente.")
+            return False
+        if not restric["activa"]:
+            print("⏸️  Restricción desactivada por el usuario.")
+            return False
+
+        code = restric["code"]
+        try:
+            exec(code, self.exec_context)
+            for c in self.model.getConstrs():
+                if c.constrName not in self.constraint_descriptions:
+                    self.constraint_descriptions[c.constrName] = nl
+            print("✅ Restricción añadida al modelo final.")
+            return True
+        except Exception as e:
+            print(f"❌ Fallo inesperado al añadir la restricción activa: {e}")
+            return False
 
     # ───────────────────────────────── optimizar ──────────────────────────
     # ───────────────────────────────── optimizar ──────────────────────────
@@ -165,3 +165,72 @@ class ShiftOptimizer:
             dia_hum = dia_idx + 1
             turno   = horarios[franja_idx] if franja_idx < len(horarios) else f"franja {franja_idx}"
             print(" · ".join(partes) + f"  →  día {dia_hum}, {turno}")
+
+    def validar_restriccion(self, nl: str, code: str, max_attempts: int = config.MAX_ATTEMPTS) -> bool:
+        """
+        Valida la restricción en un modelo temporal intentando hasta max_attempts.
+        Guarda la última versión válida traducida si tiene éxito.
+        """
+        attempt = 0
+        current_code = code
+
+        while attempt < max_attempts:
+            # 1) crea un nuevo modelo sólo para testear esta restricción
+            modelo_temp = Model(f"ModeloTemporal_{attempt}")
+
+            # 2) prepara un contexto limpio apuntando a este modelo temporal
+            contexto_temp = {
+                "model": modelo_temp,
+                "GRB": GRB,
+                "quicksum": quicksum,
+                "gp": gp,
+                "specs": self.specs,
+                "data": self.specs,
+                "variables": self.specs.get("variables", {}),
+                "resources": self.specs.get("resources", {})
+            }
+
+            # 2.1) inyecta en el contexto todas las listas de specs
+            for k, v in self.specs.get("variables", {}).items():
+                contexto_temp[k] = v
+            for k, v in self.specs.get("resources", {}).items():
+                contexto_temp[k] = v
+
+            # 3) reconstruye el bloque decision_variables sobre modelo_temp
+            #    (misma transformación que en __init__)
+            dv_code = (
+                self.specs["decision_variables"]
+                .replace("\\n", "\n")
+                .replace("self.model", "model")
+                .replace("self.", "")
+            )
+            dv_code = dv_code.replace("model.GRB.", "GRB.").replace("self.GRB.", "GRB.")
+            exec(compile(dv_code, "<decision_variables>", "exec"), contexto_temp)
+
+            # 4) detecta y agrupa todas las x_* en decision_vars_temp
+            decision_vars_temp = {}
+            for k, v in contexto_temp.items():
+                if k.startswith("x_") and isinstance(v, (dict, tupledict)):
+                    decision_vars_temp.update(v)
+            contexto_temp["x"] = decision_vars_temp
+
+            try:
+                # 5) prueba la restricción en este contexto
+                exec(current_code, contexto_temp)
+
+                # 6) si todo OK, guarda la validación y sal
+                self.restricciones_validadas[nl] = {"code": current_code, "activa": True}
+                print(f"✔️  Restricción validada en intento {attempt + 1}: '{nl}'")
+                return True
+
+            except Exception as e:
+                # 7) en caso de fallo, reintenta traducir y aumentar contador
+                attempt += 1
+                print(f"⚠️  Error validando restricción (intento {attempt}/{max_attempts}): {e}")
+                nl_mod = f"{nl}\nError completo: {e}\nCorrige la restricción."
+                current_code = translate_constraint_to_code(nl_mod, self.specs)
+
+        # 8) agotados los intentos, marcar error final
+        print(f"✖️  No se pudo validar la restricción tras {max_attempts} intentos: '{nl}'")
+        return False
+
