@@ -78,43 +78,45 @@ def edit_constraint():
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
     """
-    Aplica las restricciones activas marcadas en el frontend y lanza la optimización.
-    Se espera un JSON con 'active_constraints': ["NL1", "NL2", ...]
+    Actualiza los flags 'activa' según active_constraints,
+    luego llama a optimizar() que monta sólo las restricciones activas.
     """
-
     global global_model
     if not global_model:
-        return jsonify({"error": "No se encontró ningún modelo. Proporciona primero el contexto y las restricciones."}), 400
+        return jsonify({"error": "No se encontró ningún modelo."}), 400
 
     data = request.get_json() or {}
-    active = data.get('active_constraints', [])
+    active_list = data.get('active_constraints', [])
 
-    # Añadir solo las restricciones validadas y activas
-    added = []
-    failed = []
-    for nl in active:
-        if global_model.agregar_restriccion(nl):
-            added.append(nl)
-        else:
-            failed.append(nl)
+    # 1) Desactivo todas
+    for nl, info in global_model.restricciones_validadas.items():
+        info["activa"] = False
 
-    # Optimizar el modelo
+    # 2) Marco como activas sólo las que vienen del front
+    for nl in active_list:
+        if nl in global_model.restricciones_validadas:
+            global_model.restricciones_validadas[nl]["activa"] = True
+
+    # 3) Optimizo: reset_model() + sólo active==True
     global_model.optimizar()
 
-    # Preparar respuesta
+    # 4) Preparo la solución
     if global_model.model.status == gp.GRB.OPTIMAL:
-        solution = {f"x{key}": var.X for key, var in global_model.decision_vars.items() if var.X > 0.5}
+        solution = {
+            str(key): var.X
+            for key, var in global_model.decision_vars.items()
+            if var.X > 0.5
+        }
     else:
         solution = "No se encontró una solución óptima."
 
-        # Exportar resultados a Excel/lo que haga falta
+    # 5) Exporto resultados como antes
     variables = session.get('variables', {})
     exportar_resultados(global_model.model, global_model.decision_vars, variables)
 
     return jsonify({
-        "added_constraints": added,
-        "failed_constraints": failed,
-        "solution": solution
+        "solution": solution,
+        "status": global_model.model.status
     })
 
 @routes.route('/api/download_excel')
