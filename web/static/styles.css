@@ -411,3 +411,55 @@ button:hover, .btn:hover {
     border: 1px solid #ccc;
     padding: 10px;
 }
+
+/* Estilo general del checkbox */
+.chk-rest {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #555;
+  border-radius: 4px;
+  display: inline-block;
+  position: relative;
+  margin-right: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  vertical-align: middle;
+  background-color: #fff;
+}
+
+.chk-rest:checked {
+  background-color: #007bff; /* Azul principal */
+  border-color: #007bff;
+}
+
+.chk-rest:checked::after {
+  content: '✔';
+  color: white;
+  position: absolute;
+  font-size: 14px;
+  left: 2px;
+  top: -2px;
+}
+
+/* Asegura que el label quede alineado correctamente */
+.restriccion-item label {
+  cursor: pointer;
+  user-select: none;
+}
+.chk-rest:hover {
+  border-color: #0056b3;
+}
+
+.edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #555;
+}
+.edit-btn:hover {
+    color: #000;
+}
+

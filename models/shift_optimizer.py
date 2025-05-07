@@ -62,6 +62,10 @@ class ShiftOptimizer:
 
     # ───────────────────────────────── agregar restricción ────────────────
     def agregar_restriccion(self, nl: str):
+
+        # Imprimir el dict restricciones validadas
+        print("\n🔍 Restricciones validadas:")
+        print(self.restricciones_validadas)
         restric = self.restricciones_validadas.get(nl)
         if not restric:
             print("⚠️  Restricción no validada previamente.")
@@ -82,7 +86,6 @@ class ShiftOptimizer:
             print(f"❌ Fallo inesperado al añadir la restricción activa: {e}")
             return False
 
-    # ───────────────────────────────── optimizar ──────────────────────────
     # ───────────────────────────────── optimizar ──────────────────────────
     def optimizar(self):
         self.model.setParam("Threads", 1)
@@ -234,3 +237,35 @@ class ShiftOptimizer:
         print(f"✖️  No se pudo validar la restricción tras {max_attempts} intentos: '{nl}'")
         return False
 
+    def editar_restriccion(self, nl: str, nuevo_nl: str) -> bool:
+        """
+        Edita la descripción (nl) de una restricción previamente registrada,
+        traduciendo la nueva descripción a código y validándolo.
+        """
+        # 1) Compruebo que la original exista
+        if nl not in self.restricciones_validadas:
+            print("⚠️  No existe esa restricción para editar.")
+            return False
+
+        # 2) Recupero su estado previo
+        fue_activa = self.restricciones_validadas[nl]["activa"]
+
+        # 3) Traduzco la nueva descripción a código
+        print(f"✏️  Traduciendo '{nuevo_nl}' a código…")
+        nuevo_code = translate_constraint_to_code(nuevo_nl, self.specs)
+
+        # 4) Intento validarlo (esto guardará en self.restricciones_validadas[nl])
+        if not self.validar_restriccion(nuevo_nl, nuevo_code):
+            print("❌  No se pudo validar la nueva restricción. La edición ha fallado.")
+            return False
+
+        # 5) Recupero la entrada recién creada y le pongo el estado anterior
+        entry = self.restricciones_validadas.pop(nuevo_nl)
+        entry["activa"] = fue_activa
+
+        # 6) Elimino la antigua y guardo la nueva bajo la nueva descripción
+        del self.restricciones_validadas[nl]
+        self.restricciones_validadas[nuevo_nl] = entry
+
+        print(f"✅  Restricción editada: '{nl}' → '{nuevo_nl}' (estado activa={fue_activa})")
+        return True

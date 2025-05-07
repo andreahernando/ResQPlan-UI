@@ -1,20 +1,20 @@
 document.addEventListener("DOMContentLoaded", function () {
     let procesandoRestricciones = false;
-    const okButton = document.getElementById('ok-button');
-    const contextInput = document.getElementById('context');
-    const loadingOverlay = document.getElementById('loading-overlay');
+    const okButton = document.getElementById("ok-button");
+    const contextInput = document.getElementById("context");
+    const loadingOverlay = document.getElementById("loading-overlay");
 
     function showNotification(type, message) {
-        const notification = document.createElement('div');
-        notification.classList.add('notification', 'show', type);
+        const notification = document.createElement("div");
+        notification.classList.add("notification", "show", type);
 
-        const icon = document.createElement('span');
-        icon.classList.add('icon');
-        if (type === 'success') icon.textContent = '✔️';
-        else if (type === 'error') icon.textContent = '❌';
-        else if (type === 'warning') icon.textContent = '⚠️';
+        const icon = document.createElement("span");
+        icon.classList.add("icon");
+        if (type === "success") icon.textContent = "✔️";
+        else if (type === "error") icon.textContent = "❌";
+        else if (type === "warning") icon.textContent = "⚠️";
 
-        const text = document.createElement('span');
+        const text = document.createElement("span");
         text.textContent = message;
 
         notification.appendChild(icon);
@@ -22,129 +22,194 @@ document.addEventListener("DOMContentLoaded", function () {
         document.body.appendChild(notification);
 
         setTimeout(() => {
-            notification.classList.remove('show');
+            notification.classList.remove("show");
             setTimeout(() => notification.remove(), 300);
         }, 3000);
     }
 
     if (loadingOverlay) loadingOverlay.style.display = "none";
-
     function mostrarPantallaCarga() {
-        loadingOverlay.style.display = "flex";
+        if (loadingOverlay) loadingOverlay.style.display = "flex";
     }
 
     function continuar() {
+        if (!contextInput) return;
         const context = contextInput.value.trim();
         if (!context) {
             showNotification("warning", "Por favor ingresa algún contexto.");
             return;
         }
-
         mostrarPantallaCarga();
         sessionStorage.setItem("cargando", "true");
-
-        fetch('/api/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input_data: context })
+        fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input_data: context }),
         })
-            .then(response => response.json())
-            .then(data => {
+            .then((res) => res.json())
+            .then((data) => {
                 sessionStorage.setItem("variables", JSON.stringify(data.result));
                 window.location.href = "/restricciones";
             })
-            .catch(error => {
-                console.error('Error:', error);
+            .catch((_) => {
                 showNotification("error", "Error al contactar con la API.");
                 sessionStorage.setItem("cargando", "error");
             });
     }
 
-    if (okButton) {
-        okButton.addEventListener("click", continuar);
-    }
-
+    if (okButton) okButton.addEventListener("click", continuar);
     if (contextInput) {
-        contextInput.addEventListener("keypress", function (event) {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
+        contextInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
                 continuar();
             }
         });
     }
 
-    const convertButton = document.getElementById('convert-button');
-
-    if (convertButton) {
-        convertButton.addEventListener('click', async function () {
-            const constraintInput = document.getElementById('constraint');
-            const rawConstraints = constraintInput.value.trim();
-
-            if (!rawConstraints) {
-                showNotification("warning", "Por favor ingresa al menos una restricción.");
-                return;
-            }
-
-            constraintInput.value = "";
-            constraintInput.focus();
-
-            const constraints = rawConstraints.split('\n').map(c => c.trim()).filter(c => c);
-
-            procesandoRestricciones = true;
-
-            for (const constraint of constraints) {
-                await intentarConvertir(constraint);
-            }
-
-            procesandoRestricciones = false;
+    function guardarRestricciones() {
+        const items = document.querySelectorAll(".restriccion-item");
+        const arr = [];
+        items.forEach((li) => {
+            const chk = li.querySelector(".chk-rest");
+            const txt = li.querySelector("label")?.innerText;
+            if (txt != null) arr.push({ texto: txt, activa: chk.checked });
         });
+        sessionStorage.setItem("restricciones", JSON.stringify(arr));
     }
 
     async function intentarConvertir(constraint, intentos = 3) {
         try {
-            const response = await fetch('/api/convert', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ constraint })
+            const res = await fetch("/api/convert", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ constraint }),
             });
+            if (!res.ok) throw new Error("Respuesta no ok");
+            await res.json(); // no usamos el resultado visual aquí
 
-            if (!response.ok) {
-                throw new Error("Error en la respuesta del servidor");
-            }
+            const lista = document.querySelector(".restricciones-list");
+            if (!lista) return;
 
-            const data = await response.json();
+            // evitar duplicados
+            if (
+                Array.from(lista.children).some(
+                    (li) => li.querySelector("label")?.innerText === constraint
+                )
+            ) return;
 
-            const lista = document.querySelector('.restricciones-list');
-            const li = document.createElement('li');
-            li.classList.add('restriccion-item');
+            const li = document.createElement("li");
+            li.classList.add("restriccion-item");
 
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = true;               // por defecto activa
-            checkbox.classList.add('chk-rest');
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = true;
+            checkbox.classList.add("chk-rest");
+            checkbox.addEventListener("change", guardarRestricciones);
 
-            const label = document.createElement('label');
+            const label = document.createElement("label");
             label.textContent = constraint;
-            label.style.marginLeft = '8px';
+            label.style.marginLeft = "8px";
 
-            li.appendChild(checkbox);
-            li.appendChild(label);
+            // botón editar
+            const editButton = document.createElement("button");
+            editButton.textContent = "✏️";
+            editButton.classList.add("edit-btn");
+            editButton.style.marginLeft = "8px";
+            editButton.addEventListener("click", async () => {
+              const oldNl = label.textContent;
+              const newNl = prompt("Editar restricción:", oldNl);
+              if (!newNl || !newNl.trim() || newNl === oldNl) return;
+              try {
+                const res = await fetch("/api/edit_constraint", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ old_nl: oldNl, new_nl: newNl.trim() })
+                });
+                const result = await res.json();
+                if (res.ok && result.success) {
+                  label.textContent = newNl.trim();
+                  guardarRestricciones();
+                  showNotification("success", "Restricción editada correctamente.");
+                } else {
+                  throw new Error(result.error || "Fallo en servidor");
+                }
+              } catch (err) {
+                showNotification("error", "No se pudo editar la restricción.");
+                console.error(err);
+              }
+            });
+            li.append(checkbox, label, editButton);
             lista.appendChild(li);
-
-
+            guardarRestricciones();
             showNotification("success", "Restricción añadida correctamente.");
-        } catch (error) {
+        } catch (err) {
             if (intentos > 1) {
-                console.warn(`Intento fallido. Reintentando... (${4 - intentos}º intento fallido)`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise((r) => setTimeout(r, 1000));
                 return intentarConvertir(constraint, intentos - 1);
             } else {
-                console.error("Fallo tras varios intentos:", error);
-                showNotification("error", "No se pudo añadir la restricción. Revisa el contexto o inténtalo de nuevo.");
-                document.getElementById('constraint-result').innerText = "Error al contactar con la API.";
+                showNotification("error", "No se pudo añadir la restricción.");
+                const resDiv = document.getElementById("constraint-result");
+                if (resDiv) resDiv.innerText = "Error al contactar con la API.";
             }
         }
     }
+
+    const convertButton = document.getElementById("convert-button");
+    if (convertButton) {
+        convertButton.addEventListener("click", async () => {
+            const inp = document.getElementById("constraint");
+            if (!inp) return;
+            const raw = inp.value.trim();
+            if (!raw) {
+                showNotification("warning", "Por favor ingresa al menos una restricción.");
+                return;
+            }
+            inp.value = "";
+            inp.focus();
+            procesandoRestricciones = true;
+            for (const c of raw.split("\n").map((x) => x.trim()).filter(Boolean)) {
+                await intentarConvertir(c);
+            }
+            procesandoRestricciones = false;
+        });
+    }
+
+    function cargarRestricciones() {
+        const lista = document.querySelector(".restricciones-list");
+        if (!lista) return;
+        const guardadas = JSON.parse(sessionStorage.getItem("restricciones") || "[]");
+        guardadas.forEach(({ texto, activa }) => {
+            const li = document.createElement("li");
+            li.classList.add("restriccion-item");
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = activa;
+            checkbox.classList.add("chk-rest");
+            checkbox.addEventListener("change", guardarRestricciones);
+
+            const label = document.createElement("label");
+            label.textContent = texto;
+            label.style.marginLeft = "8px";
+
+            const editButton = document.createElement("button");
+            editButton.textContent = "✏️";
+            editButton.classList.add("edit-btn");
+            editButton.style.marginLeft = "8px";
+            editButton.addEventListener("click", async () => {
+              const oldNl = label.textContent;
+              const newNl = prompt("Editar restricción:", oldNl);
+              if (!newNl || !newNl.trim() || newNl === oldNl) return;
+              // idéntico fetch a /api/edit_constraint…
+            });
+            li.append(checkbox, label, editButton);
+            lista.appendChild(li);
+        });
+    }
+
+    // cargar al inicio
+    cargarRestricciones();
 
     const resultadoModal = document.getElementById("resultado-modal");
     const resultadoContenido = document.getElementById("resultado-contenido");

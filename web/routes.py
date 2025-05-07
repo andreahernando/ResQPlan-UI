@@ -63,6 +63,17 @@ def convert():
         "code": translated_code,
         "valid": valid
     })
+@routes.route("/api/edit_constraint", methods=["POST"])
+def edit_constraint():
+    data = request.json
+    old_nl = data["old_nl"]
+    new_nl = data["new_nl"]
+    ok = global_model.editar_restriccion(old_nl, new_nl)
+    if ok:
+        return jsonify(success=True)
+    else:
+        return jsonify(success=False, error="Validación fallida"), 400
+
 
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
