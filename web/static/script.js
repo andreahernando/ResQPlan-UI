@@ -78,6 +78,115 @@ document.addEventListener("DOMContentLoaded", function () {
         sessionStorage.setItem("restricciones", JSON.stringify(arr));
     }
 
+    function attachInlineEditor(li, label, guardarRestricciones, showNotification) {
+      // Contenedor para los controles de edición (alineados a la derecha)
+      const controlsWrapper = document.createElement("div");
+      controlsWrapper.classList.add("edit-controls");
+      controlsWrapper.style.display = "flex";
+      controlsWrapper.style.alignItems = "center";
+      controlsWrapper.style.marginLeft = "auto";
+
+      // Botón ✏️
+      const editButton = document.createElement("button");
+      editButton.textContent = "✏️";
+      editButton.classList.add("edit-btn");
+      editButton.title = "Editar"
+
+      controlsWrapper.appendChild(editButton);
+      li.appendChild(controlsWrapper);
+
+      editButton.addEventListener("click", () => {
+        const oldText = label.textContent;
+
+        // Input de edición (más ancho)
+        const inputEdit = document.createElement("input");
+        inputEdit.type = "text";
+        inputEdit.value = oldText;
+        inputEdit.classList.add("edit-input");
+
+        // Contenedor para guardar/cancelar
+        const inlineControls = document.createElement("div");
+        inlineControls.classList.add("inline-controls");
+        inlineControls.style.display = "flex";
+        inlineControls.style.alignItems = "center";
+        inlineControls.style.marginLeft = "auto";
+
+        // Botón 💾
+        const saveBtn = document.createElement("button");
+        saveBtn.textContent = "💾";
+        saveBtn.classList.add("save-btn");
+        saveBtn.title = "Guardar";
+
+        // Botón ✖️
+        const cancelBtn = document.createElement("button");
+        cancelBtn.textContent = "✖️";
+        cancelBtn.classList.add("cancel-btn");
+        cancelBtn.title = "Cancelar";
+
+        inlineControls.append(saveBtn, cancelBtn);
+
+        // Reemplazar label y controles
+        label.replaceWith(inputEdit);
+        controlsWrapper.replaceWith(inlineControls);
+
+        // Focus al input
+        inputEdit.focus();
+        inputEdit.select();
+
+        // Cancelar edición
+        cancelBtn.addEventListener("click", () => {
+          inputEdit.replaceWith(label);
+          inlineControls.replaceWith(controlsWrapper);
+        });
+
+        // Guardar edición
+        saveBtn.addEventListener("click", async () => {
+          const newText = inputEdit.value.trim();
+          if (!newText || newText === oldText) return cancelBtn.click();
+          // --- 1) Mostrar spinner y desactivar botones ---
+          const originalContent = saveBtn.textContent;
+          saveBtn.textContent = "";                 // vacío para meter spinner
+            cancelBtn.style.display = "none";
+          saveBtn.disabled = true;
+          cancelBtn.disabled = true;
+
+          const spinner = document.createElement("span");
+          spinner.classList.add("save-spinner");         // definiremos estilos CSS abajo
+          saveBtn.appendChild(spinner);
+
+          try {
+            const res = await fetch("/api/edit_constraint", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ old_nl: oldText, new_nl: newText })
+            });
+            const result = await res.json();
+
+            if (res.ok && result.success) {
+              label.textContent = newText;
+              inputEdit.replaceWith(label);
+              inlineControls.replaceWith(controlsWrapper);
+              guardarRestricciones();
+              showNotification("success", "Restricción editada correctamente.");
+            } else {
+              throw new Error(result.error || "Server error");
+            }
+          } catch (e) {
+            showNotification("error", "Error al editar restricción.");
+            console.error(e);
+
+            // --- 4) Si falla, restauramos el botón para reintentar o cancelar ---
+            saveBtn.removeChild(spinner);
+            saveBtn.textContent = originalContent;
+            saveBtn.disabled = false;
+            cancelBtn.disabled = false;
+          }
+        });
+      });
+    }
+
+
+
     async function intentarConvertir(constraint, intentos = 3) {
         try {
             const res = await fetch("/api/convert", {
@@ -111,35 +220,9 @@ document.addEventListener("DOMContentLoaded", function () {
             label.textContent = constraint;
             label.style.marginLeft = "8px";
 
-            // botón editar
-            const editButton = document.createElement("button");
-            editButton.textContent = "✏️";
-            editButton.classList.add("edit-btn");
-            editButton.style.marginLeft = "8px";
-            editButton.addEventListener("click", async () => {
-              const oldNl = label.textContent;
-              const newNl = prompt("Editar restricción:", oldNl);
-              if (!newNl || !newNl.trim() || newNl === oldNl) return;
-              try {
-                const res = await fetch("/api/edit_constraint", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ old_nl: oldNl, new_nl: newNl.trim() })
-                });
-                const result = await res.json();
-                if (res.ok && result.success) {
-                  label.textContent = newNl.trim();
-                  guardarRestricciones();
-                  showNotification("success", "Restricción editada correctamente.");
-                } else {
-                  throw new Error(result.error || "Fallo en servidor");
-                }
-              } catch (err) {
-                showNotification("error", "No se pudo editar la restricción.");
-                console.error(err);
-              }
-            });
-            li.append(checkbox, label, editButton);
+
+            li.append(checkbox, label);
+            attachInlineEditor(li, label, guardarRestricciones, showNotification);
             lista.appendChild(li);
             guardarRestricciones();
             showNotification("success", "Restricción añadida correctamente.");
@@ -172,6 +255,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 await intentarConvertir(c);
             }
             procesandoRestricciones = false;
+            convertButton.disabled = false;
         });
     }
 
@@ -193,17 +277,8 @@ document.addEventListener("DOMContentLoaded", function () {
             label.textContent = texto;
             label.style.marginLeft = "8px";
 
-            const editButton = document.createElement("button");
-            editButton.textContent = "✏️";
-            editButton.classList.add("edit-btn");
-            editButton.style.marginLeft = "8px";
-            editButton.addEventListener("click", async () => {
-              const oldNl = label.textContent;
-              const newNl = prompt("Editar restricción:", oldNl);
-              if (!newNl || !newNl.trim() || newNl === oldNl) return;
-              // idéntico fetch a /api/edit_constraint…
-            });
-            li.append(checkbox, label, editButton);
+            li.append(checkbox, label);
+            attachInlineEditor(li, label, guardarRestricciones, showNotification);
             lista.appendChild(li);
         });
     }
