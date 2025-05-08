@@ -27,25 +27,33 @@ body {
 
 /* Panel superior para contexto */
 .context-panel {
-    width: 80%;
-    max-width: 700px;
-    min-height: 300px;
+    width: 95%;
+    max-width: 1000px;
+    min-height: auto;
     background-color: #dfeffc;
-    border-radius: 8px;
-    padding: 35px;
-    margin-top: 60px;
+    border-radius: 10px;
+    padding: 20px 30px;        /* más lateral para centrado */
+    margin-top: 30px;
     text-align: center;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+
+.context-panel h2 {
+    font-size: 20px;            /* texto del título más pequeño */
+    margin-bottom: 8px;
 }
 
 .context-panel textarea {
     width: 100%;
-    height: 180px;
+    height: 100px;              /* más alto para facilitar la escritura */
     padding: 10px;
-    border: 1px solid #bcd3eb;
-    border-radius: 5px;
+    border: 1px solid #aacbe2;
+    border-radius: 8px;
     resize: vertical;
-    font-size: 16px;
+    font-size: 15px;
+    background-color: #f8fbff;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
 }
 
 /* Contenedor principal */
@@ -56,6 +64,32 @@ body {
     margin-top: 20px;
     padding: 20px;
 }
+.context-btns {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    margin-top: 0.5rem;     /* o el espacio que necesites */
+}
+
+/* Aplica el mismo estilo de tu #ok-button a todos los botones aquí */
+.context-btns button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
+  font-weight: bold;
+}
+
+.context-btns button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
 
 /* Paneles de restricciones */
 .panel {
@@ -153,22 +187,28 @@ button:hover, .btn:hover {
     margin-top: auto;
 }
 
-#ok-button {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    padding: 12px 20px;
-    font-size: 18px;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background 0.3s ease;
-    display: block;
-    margin-left: auto;
+.context-button-container {
+    display: flex;
+    justify-content: flex-end;
 }
 
-#ok-button:hover {
-    background-color: #0056b3;
+
+.textarea-with-button {
+    resize: none;
+    position: relative;
 }
+
+#context {
+    width: 100%;
+    min-height: 120px;
+    padding: 10px;
+    padding-right: 90px; /* espacio para el botón */
+    font-family: monospace;
+    font-size: 14px;
+    resize: none;
+    box-sizing: border-box;
+}
+
 
 /* Caja de resultados */
 .result-box {
@@ -236,6 +276,56 @@ button:hover, .btn:hover {
         margin-bottom: 20px;
     }
 }
+
+/* Reutiliza tu estilo genérico de modals */
+#summary-popup.modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+#summary-popup .modal-content {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  position: relative;
+}
+/* Close button del popup de resumen */
+#summary-popup .close-summary-popup {
+  color: #333;               /* color oscuro para que se vea sobre blanco */
+  background: rgba(0, 0, 0, 0.1);  /* leve fondo semitransparente */
+  border: none;
+  border-radius: 50%;        /* círculo */
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#summary-popup .close-summary-popup:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.close-summary-popup {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 
 .modal {
     display: none;
@@ -350,56 +440,6 @@ button:hover, .btn:hover {
 .close-btn:hover {
     color: #000; /* Más oscuro al pasar el mouse */
 }
-/* Notificación general */
-.notification {
-    position: fixed;
-    bottom: 20px; /* 👈 Cambiado de top a bottom */
-    right: 20px;
-    background-color: #fff;
-    color: #333;
-    border-left: 6px solid;
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    opacity: 0;
-    transform: translateY(20px); /* 👈 Cambiado para animar desde abajo */
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    z-index: 9999;
-}
-
-/* Cuando se muestra */
-.notification.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-/* Ícono */
-.notification .icon {
-    font-size: 20px;
-}
-
-/* Tipos de notificación */
-.notification.success {
-    border-color: #4CAF50;
-    background-color: #eafaf1;
-    color: #2e7d32;
-}
-
-.notification.error {
-    border-color: #f44336;
-    background-color: #fdecea;
-    color: #c62828;
-}
-
-.notification.warning {
-    border-color: #ff9800;
-    background-color: #fff4e5;
-    color: #ef6c00;
-}
 
 .resultado-grid {
     width: 100%;
@@ -508,4 +548,116 @@ button:hover, .btn:hover {
 @keyframes spin-small {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+#progress-container {
+  display: none;
+  width: 100%;
+  max-width: 400px;
+  margin: 1rem auto;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #333;
+  font-family: Arial, sans-serif;
+}
+
+#progress-bar {
+  width: 100%;
+  height: 0.6rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background-color: #eee;
+  appearance: none;
+}
+
+#progress-bar::-webkit-progress-bar {
+  background-color: #eee;
+  border-radius: 1rem;
+}
+
+#progress-bar::-webkit-progress-value {
+  background: linear-gradient(to right, #4caf50, #66bb6a);
+  transition: width 0.3s ease-in-out;
+  border-radius: 1rem;
+}
+
+#progress-label {
+  margin-top: 0.5rem;
+  font-weight: 500;
+  color: #555;
+}
+
+
+/* contenedor de toasts */
+#toast-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* contenedor base de toasts sin cambio */
+.toast {
+  display: flex;
+  align-items: center;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  color: #333;
+  font-family: Arial, sans-serif;
+  font-size: 0.95rem;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* icono y botón cerrar heredan color */
+.toast .icon,
+.toast button {
+  color: inherit;
+}
+
+/* Éxito */
+.toast.success {
+  background-color: #e8f5e9;    /* verde muy suave */
+  border-left: 4px solid #4caf50;
+  color: #2e7d32;               /* verde oscuro para texto */
+}
+.toast.success .icon {
+  margin-right: 0.75rem;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+/* Error */
+.toast.error {
+  background-color: #ffebee;    /* rojo muy suave */
+  border-left: 4px solid #e53935;
+  color: #c62828;               /* rojo oscuro para texto */
+}
+.toast.error .icon { /* mismos ajustes de icono */ }
+
+/* Advertencia */
+.toast.warning {
+  background-color: #fff8e1;    /* amarillo muy suave */
+  border-left: 4px solid #f9a825;
+  color: #ef6c00;               /* amarillo oscuro para texto */
+}
+.toast.warning .icon { /* mismos ajustes de icono */ }
+
+/* animaciones sin cambiar */
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+.toast.hide {
+  opacity: 0;
+  transform: translateX(100%);
 }

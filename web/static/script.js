@@ -1,31 +1,69 @@
 document.addEventListener("DOMContentLoaded", function () {
     let procesandoRestricciones = false;
+    let originalText  = "";
     const okButton = document.getElementById("ok-button");
     const contextInput = document.getElementById("context");
+    const wrapper      = document.querySelector(".textarea-with-button");
     const loadingOverlay = document.getElementById("loading-overlay");
 
-    function showNotification(type, message) {
-        const notification = document.createElement("div");
-        notification.classList.add("notification", "show", type);
-
-        const icon = document.createElement("span");
-        icon.classList.add("icon");
-        if (type === "success") icon.textContent = "✔️";
-        else if (type === "error") icon.textContent = "❌";
-        else if (type === "warning") icon.textContent = "⚠️";
-
-        const text = document.createElement("span");
-        text.textContent = message;
-
-        notification.appendChild(icon);
-        notification.appendChild(text);
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.classList.remove("show");
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
+    let btnContainer = wrapper.querySelector('.context-btns');
+    if (!btnContainer) {
+      btnContainer = document.createElement('div');
+      btnContainer.className = 'context-btns';
+      wrapper.appendChild(btnContainer);
     }
+    function showToast(type, message, duration = 3000) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      // Crear elemento
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+
+      // Icono
+      const icon = document.createElement('span');
+      icon.className = 'icon';
+      if (type === 'success') icon.textContent = '✔️';
+      else if (type === 'error') icon.textContent = '❌';
+      else if (type === 'warning') icon.textContent = '⚠️';
+
+      // Mensaje
+      const msg = document.createElement('div');
+      msg.className = 'message';
+      msg.textContent = message;
+
+      // Botón cerrar
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.setAttribute('aria-label', 'Cerrar');
+      closeBtn.style.marginLeft = '0.75rem';
+      closeBtn.style.background = 'transparent';
+      closeBtn.style.border = 'none';
+      closeBtn.style.color = 'inherit';
+      closeBtn.style.fontSize = '1.2rem';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.style.lineHeight = '1';
+      closeBtn.addEventListener('click', () => hideToast(toast));
+
+      // Montar y mostrar
+      toast.append(icon, msg, closeBtn);
+      container.appendChild(toast);
+
+      // Forzar reflow y animar entrada
+      requestAnimationFrame(() => toast.classList.add('show'));
+
+      // Auto-ocultar tras duration
+      const hideTimeout = setTimeout(() => hideToast(toast), duration);
+
+      // Función de cierre
+      function hideToast(el) {
+        clearTimeout(hideTimeout);
+        el.classList.remove('show');
+        el.classList.add('hide');
+        el.addEventListener('transitionend', () => el.remove(), { once: true });
+      }
+    }
+
 
     if (loadingOverlay) loadingOverlay.style.display = "none";
     function mostrarPantallaCarga() {
@@ -33,29 +71,170 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function continuar() {
-        if (!contextInput) return;
-        const context = contextInput.value.trim();
-        if (!context) {
-            showNotification("warning", "Por favor ingresa algún contexto.");
-            return;
+        const ctx = contextInput.value.trim();
+        if (!ctx) {
+        showToast("warning", "Por favor ingresa algún contexto.");
+        return;
         }
+
+        // ── Limpieza de botones previos ──
+        ['edit-context', 'summary-context', 'cancel-edit', 'ok-button'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.remove();
+        });
+
         mostrarPantallaCarga();
-        sessionStorage.setItem("cargando", "true");
+
         fetch("/api/translate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ input_data: context }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input_data: ctx }),
         })
-            .then((res) => res.json())
-            .then((data) => {
-                sessionStorage.setItem("variables", JSON.stringify(data.result));
-                window.location.href = "/restricciones";
-            })
-            .catch((_) => {
-                showNotification("error", "Error al contactar con la API.");
-                sessionStorage.setItem("cargando", "error");
+        .then(res =>
+        res.json()
+           .then(p => ({ status: res.status, ok: res.ok, p }))
+        )
+        .then(({ ok, status, p }) => {
+        // 1) Ocultar spinner
+        if (loadingOverlay) loadingOverlay.style.display = "none";
+
+        if (!ok) throw new Error(p.error || `HTTP ${status}`);
+
+        // 2) Guardar variables
+        sessionStorage.setItem("variables", JSON.stringify(p.result));
+
+        // 3) Desactivar edición del textarea
+        contextInput.disabled = true;
+
+        // 4) Guardar texto para posible "Cancelar"
+        originalText = ctx;
+
+        // 5) Crear y añadir botones "Editar" y "Ver resumen"
+        const btnEdit    = document.createElement("button");
+        btnEdit.type     = "button";
+        btnEdit.id       = "edit-context";
+        btnEdit.textContent = "✏️ Editar";
+
+        const btnSummary = document.createElement("button");
+        btnSummary.type  = "button";
+        btnSummary.id    = "summary-context";
+        btnSummary.textContent = "📄 Ver resumen";
+
+        btnContainer.append(btnEdit, btnSummary);
+
+        // 6) Mostrar panel de restricciones
+        const restrSection = document.querySelector(".container");
+        if (restrSection) restrSection.style.display = "flex";
+
+        showToast("success", "Contexto procesado correctamente.");
+
+        // ── Handler de “✏️ Editar” ──
+        btnEdit.addEventListener("click", () => {
+          // eliminar ambos botones
+          btnEdit.remove();
+          btnSummary.remove();
+
+          // reactivar textarea
+          contextInput.disabled = false;
+          contextInput.focus();
+
+          // crear "Subir" y "Cancelar"
+          const btnSave = document.createElement("button");
+          btnSave.type = "button";
+          btnSave.id = "ok-button";
+          btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
+
+          const btnCancel = document.createElement("button");
+          btnCancel.type = "button";
+          btnCancel.id = "cancel-edit";
+          btnCancel.textContent = "✖️ Cancelar";
+
+          btnContainer.append(btnSave, btnCancel);
+
+          // Cancelar edición: restaurar valor y volver a Editar/Resumen
+          btnCancel.addEventListener("click", () => {
+            contextInput.value    = originalText;
+            contextInput.disabled = true;
+            btnSave.remove();
+            btnCancel.remove();
+            btnContainer.append(btnEdit, btnSummary);
+          });
+
+          // Subir nuevo contexto: limpiar variables previas y reejecutar
+          btnSave.addEventListener("click", () => {
+            sessionStorage.removeItem("variables");
+            continuar();
+          });
+
+          // Enter para guardar nuevo contexto
+          contextInput.addEventListener("keypress", onEnterSave);
+        });
+
+        // ── Handler de “📄 Ver resumen” ──
+        btnSummary.addEventListener("click", () => {
+          const data = JSON.parse(sessionStorage.getItem("variables") || "{}");
+          const { resources = {}, variables = {} } = data;
+
+          // Construye la tabla como antes
+          const table = document.createElement("table");
+          table.style.width = "100%";
+          table.style.borderCollapse = "collapse";
+          const thStyle = "border:1px solid #ccc;padding:6px;background:#e9f9ff;text-align:left;";
+          const tdStyle = "border:1px solid #ccc;padding:6px;";
+
+          const thead = document.createElement("thead");
+          thead.innerHTML = `
+            <tr>
+              <th style="${thStyle}">Clave</th>
+              <th style="${thStyle}">Valores</th>
+            </tr>`;
+          table.appendChild(thead);
+
+          const tbody = document.createElement("tbody");
+          [resources, variables].forEach(obj => {
+            Object.entries(obj).forEach(([key, vals]) => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `
+                <td style="${tdStyle}">${key}</td>
+                <td style="${tdStyle}">${Array.isArray(vals) ? vals.join(", ") : vals}</td>
+              `;
+              tbody.appendChild(tr);
             });
-    }
+          });
+          table.appendChild(tbody);
+
+          // Inserta en el popup
+          const popup = document.getElementById("summary-popup");
+          const content = document.getElementById("summary-popup-content");
+          content.innerHTML = "";
+          content.appendChild(table);
+          popup.style.display = "flex";
+
+          // Cierre
+          const closeBtn = popup.querySelector(".close-summary-popup");
+          closeBtn.onclick = () => popup.style.display = "none";
+          window.addEventListener("click", e => {
+            if (e.target === popup) popup.style.display = "none";
+          }, { once: true });
+        });
+
+
+        })
+        .catch(err => {
+        // ocultar spinner en error
+        if (loadingOverlay) loadingOverlay.style.display = "none";
+        console.error(err);
+        showToast("error", err.message);
+        });
+        }
+
+
+      function onEnterSave(e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById("ok-button")?.click();
+        }
+      }
 
     if (okButton) okButton.addEventListener("click", continuar);
     if (contextInput) {
@@ -78,7 +257,7 @@ document.addEventListener("DOMContentLoaded", function () {
         sessionStorage.setItem("restricciones", JSON.stringify(arr));
     }
 
-    function attachInlineEditor(li, label, guardarRestricciones, showNotification) {
+    function attachInlineEditor(li, label, guardarRestricciones, showToast) {
       // Contenedor para los controles de edición (alineados a la derecha)
       const controlsWrapper = document.createElement("div");
       controlsWrapper.classList.add("edit-controls");
@@ -103,6 +282,18 @@ document.addEventListener("DOMContentLoaded", function () {
         inputEdit.type = "text";
         inputEdit.value = oldText;
         inputEdit.classList.add("edit-input");
+
+        inputEdit.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            saveBtn.click();
+          }
+          // Escape para cancelar:
+          if (e.key === "Escape") {
+            e.preventDefault();
+            cancelBtn.click();
+          }
+        });
 
         // Contenedor para guardar/cancelar
         const inlineControls = document.createElement("div");
@@ -167,12 +358,12 @@ document.addEventListener("DOMContentLoaded", function () {
               inputEdit.replaceWith(label);
               inlineControls.replaceWith(controlsWrapper);
               guardarRestricciones();
-              showNotification("success", "Restricción editada correctamente.");
+              showToast("success", "Restricción editada correctamente.");
             } else {
               throw new Error(result.error || "Server error");
             }
           } catch (e) {
-            showNotification("error", "Error al editar restricción.");
+            showToast("error", "Error al editar restricción.");
             console.error(e);
 
             // --- 4) Si falla, restauramos el botón para reintentar o cancelar ---
@@ -222,16 +413,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
             li.append(checkbox, label);
-            attachInlineEditor(li, label, guardarRestricciones, showNotification);
+            attachInlineEditor(li, label, guardarRestricciones, showToast);
             lista.appendChild(li);
             guardarRestricciones();
-            showNotification("success", "Restricción añadida correctamente.");
+            showToast("success", "Restricción añadida correctamente.");
         } catch (err) {
             if (intentos > 1) {
                 await new Promise((r) => setTimeout(r, 1000));
                 return intentarConvertir(constraint, intentos - 1);
             } else {
-                showNotification("error", "No se pudo añadir la restricción.");
+                showToast("error", "No se pudo añadir la restricción.");
                 const resDiv = document.getElementById("constraint-result");
                 if (resDiv) resDiv.innerText = "Error al contactar con la API.";
             }
@@ -240,24 +431,56 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const convertButton = document.getElementById("convert-button");
     if (convertButton) {
-        convertButton.addEventListener("click", async () => {
-            const inp = document.getElementById("constraint");
-            if (!inp) return;
-            const raw = inp.value.trim();
-            if (!raw) {
-                showNotification("warning", "Por favor ingresa al menos una restricción.");
-                return;
-            }
-            inp.value = "";
-            inp.focus();
-            procesandoRestricciones = true;
-            for (const c of raw.split("\n").map((x) => x.trim()).filter(Boolean)) {
-                await intentarConvertir(c);
-            }
-            procesandoRestricciones = false;
-            convertButton.disabled = false;
-        });
+      convertButton.addEventListener("click", async () => {
+        const inp = document.getElementById("constraint");
+        if (!inp) return;
+
+        const raw = inp.value.trim();
+        if (!raw) {
+          showToast("warning", "Por favor ingresa al menos una restricción.");
+          return;
+        }
+
+        // Preparo lista de restricciones
+        const constraints = raw
+          .split("\n")
+          .map((x) => x.trim())
+          .filter(Boolean);
+
+        // Limpio textarea y pongo foco
+        inp.value = "";
+        inp.focus();
+
+        // Mostrar y configurar barra de progreso
+        const progressContainer = document.getElementById("progress-container");
+        const progressBar       = document.getElementById("progress-bar");
+        const progressLabel     = document.getElementById("progress-label");
+        progressBar.max   = constraints.length;
+        progressBar.value = 0;
+        progressLabel.textContent = `Procesando 0 de ${constraints.length}…`;
+        progressContainer.style.display = "block";
+
+        // Deshabilito botón y marco estado
+        procesandoRestricciones = true;
+        convertButton.disabled  = true;
+
+        // Itero y actualizo progreso
+        for (let i = 0; i < constraints.length; i++) {
+          const c = constraints[i];
+          await intentarConvertir(c);
+          progressBar.value = i + 1;
+          progressLabel.textContent = `Procesando ${i + 1} de ${constraints.length}…`;
+        }
+
+        // Restauro estado inicial
+        procesandoRestricciones = false;
+        convertButton.disabled   = false;
+        progressContainer.style.display = "none";
+
+        showToast("success", "Todas las restricciones se han añadido.");
+      });
     }
+
 
     function cargarRestricciones() {
         const lista = document.querySelector(".restricciones-list");
@@ -278,7 +501,7 @@ document.addEventListener("DOMContentLoaded", function () {
             label.style.marginLeft = "8px";
 
             li.append(checkbox, label);
-            attachInlineEditor(li, label, guardarRestricciones, showNotification);
+            attachInlineEditor(li, label, guardarRestricciones, showToast);
             lista.appendChild(li);
         });
     }
@@ -330,12 +553,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (optimizeButton) {
         optimizeButton.addEventListener('click', function () {
             if (procesandoRestricciones) {
-                showNotification("warning", "Espera a que se terminen de procesar las restricciones antes de optimizar.");
+                showToast("warning", "Espera a que se terminen de procesar las restricciones antes de optimizar.");
                 return;
             }
             const restricciones = document.querySelector('.restricciones-list').children;
             if (restricciones.length === 0) {
-                showNotification("warning", "Por favor ingresa al menos una restricción antes de optimizar.");
+                showToast("warning", "Por favor ingresa al menos una restricción antes de optimizar.");
                 return;
             }
 
@@ -431,15 +654,15 @@ document.addEventListener("DOMContentLoaded", function () {
                         filtroSelect.addEventListener('change', () => renderTabla(filtroSelect.value));
                         renderTabla('Todos');
 
-                        showNotification("success", "Optimización completada.");
+                        showToast("success", "Optimización completada.");
                     } else {
                         resultDiv.innerText = data.solution;
-                        showNotification("success", "Resultado de la optimización disponible.");
+                        showToast("success", "Resultado de la optimización disponible.");
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    showNotification("error", "Error al contactar con la API.");
+                    showToast("error", "Error al contactar con la API.");
                     document.getElementById('optimization-result').innerText = "Error al contactar con la API.";
                 });
         });

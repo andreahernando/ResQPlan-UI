@@ -2,7 +2,7 @@ from gurobipy import Model, GRB, quicksum, tupledict
 import gurobipy as gp
 import config
 from utils.constraint_translator import translate_constraint_to_code
-import pprint
+
 
 class ShiftOptimizer:
     # ───────────────────────────────────────── constructor ────────────────
@@ -177,8 +177,8 @@ class ShiftOptimizer:
                 "variables": self.specs.get("variables", {}),
                 "resources": self.specs.get("resources", {})
             }
-            for k,v in self.specs.get("variables",{}).items(): ctx[k]=v
-            for k,v in self.specs.get("resources",{}).items(): ctx[k]=v
+            for k, v in self.specs.get("variables", {}).items(): ctx[k]=v
+            for k, v in self.specs.get("resources", {}).items(): ctx[k]=v
 
             # reconstruyo vars
             exec(self._dv_code_compiled, ctx)

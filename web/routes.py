@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, session, url_for, send_file
+from flask import Blueprint, jsonify, request, render_template, session, send_file
 from utils.constraint_translator import extract_variables_from_context, translate_constraint_to_code
 from models.shift_optimizer import ShiftOptimizer
 import gurobipy as gp
@@ -14,14 +14,9 @@ global_model = None  # Variable global para almacenar el modelo
 def index():
     return render_template('index.html')
 
-@routes.route('/restricciones')
-def restricciones():
-    """ Página donde se configuran y editan las restricciones. """
-    variables = session.get('variables', {})  # Recuperar variables de la sesión
-    return render_template('restricciones.html', variables=variables)
-
 @routes.route('/api/translate', methods=['POST'])
 def translate():
+    """ Procesa el contexto en lenguaje natural, extrae variables y crea el modelo """
     global global_model
     data = request.get_json()
     context = data.get('input_data')
@@ -30,14 +25,11 @@ def translate():
         return jsonify({"error": "No se proporcionaron datos de entrada"}), 400
 
     variables = extract_variables_from_context(context)
-
-    # Guardar en la sesión
     session['variables'] = variables
 
     global_model = ShiftOptimizer(variables)
 
-    # Redirigir a la página de restricciones después de procesar el contexto
-    return jsonify({"result": variables, "redirect": url_for('routes.restricciones')})
+    return jsonify({"result": variables})
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():
@@ -63,24 +55,25 @@ def convert():
         "code": translated_code,
         "valid": valid
     })
+
 @routes.route("/api/edit_constraint", methods=["POST"])
 def edit_constraint():
     data = request.json
     old_nl = data["old_nl"]
     new_nl = data["new_nl"]
+
+    if not global_model:
+        return jsonify(success=False, error="No se ha inicializado el modelo"), 400
+
     ok = global_model.editar_restriccion(old_nl, new_nl)
     if ok:
         return jsonify(success=True)
     else:
         return jsonify(success=False, error="Validación fallida"), 400
 
-
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
-    """
-    Actualiza los flags 'activa' según active_constraints,
-    luego llama a optimizar() que monta sólo las restricciones activas.
-    """
+    """ Activa las restricciones seleccionadas y ejecuta la optimización """
     global global_model
     if not global_model:
         return jsonify({"error": "No se encontró ningún modelo."}), 400
@@ -88,19 +81,18 @@ def optimize():
     data = request.get_json() or {}
     active_list = data.get('active_constraints', [])
 
-    # 1) Desactivo todas
+    # Desactiva todas
     for nl, info in global_model.restricciones_validadas.items():
         info["activa"] = False
 
-    # 2) Marco como activas sólo las que vienen del front
+    # Activa solo las seleccionadas
     for nl in active_list:
         if nl in global_model.restricciones_validadas:
             global_model.restricciones_validadas[nl]["activa"] = True
 
-    # 3) Optimizo: reset_model() + sólo active==True
+    # Ejecuta la optimización
     global_model.optimizar()
 
-    # 4) Preparo la solución
     if global_model.model.status == gp.GRB.OPTIMAL:
         solution = {
             str(key): var.X
@@ -110,7 +102,6 @@ def optimize():
     else:
         solution = "No se encontró una solución óptima."
 
-    # 5) Exporto resultados como antes
     variables = session.get('variables', {})
     exportar_resultados(global_model.model, global_model.decision_vars, variables)
 
@@ -121,6 +112,7 @@ def optimize():
 
 @routes.route('/api/download_excel')
 def download_excel():
+    """ Devuelve el archivo de resultados generado tras la optimización """
     excel_path = os.path.join(os.getcwd(), 'resultados_turnos.xlsx')
 
     if os.path.exists(excel_path):

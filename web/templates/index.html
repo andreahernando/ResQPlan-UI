@@ -4,17 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ResQPlan</title>
+
+    <!-- Estilos propios -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+    <!-- Font Awesome para los iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
     <header class="main-header">
         <h1>ResQPlan</h1>
     </header>
 
+    <!-- Panel de contexto -->
     <div class="context-panel">
         <h2>Describe el contexto en lenguaje natural</h2>
-        <textarea id="context" placeholder="Ejemplo: Tenemos 10 bomberos que trabajan en turnos de 8 horas..."></textarea>
-        <button id="ok-button">Continuar</button>
+        <div class="textarea-with-button">
+            <textarea id="context" placeholder="Ejemplo: …"></textarea>
+            <!-- Aquí irá el contenedor de botones de contexto -->
+            <div class="context-btns">
+                <button type="button" id="ok-button"><i class="fas fa-arrow-up"></i> Subir</button>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Panel de restricciones -->
+    <div class="container">
+        <div class="panel">
+            <h2>Ingresar Restricciones</h2>
+            <textarea id="constraint" placeholder="Ejemplo: Ningún bombero puede trabajar más de 40 horas semanales..."></textarea>
+
+            <div class="button-container">
+                <button id="convert-button">Añadir</button>
+            </div>
+
+            <div id="constraint-result" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Restricciones Añadidas</h2>
+            <div class="restricciones-list"></div>
+
+            <div id="progress-container" style="display:none; margin-top:1rem;">
+                <label for="progress-bar" id="progress-label">Procesando 0 de 0…</label>
+                <progress id="progress-bar" value="0" max="0" style="width:100%;"></progress>
+            </div>
+
+            <div class="button-container">
+                <button id="optimize-button">Optimizar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Pantalla de carga -->
@@ -25,6 +66,42 @@
         </div>
     </div>
 
+    <!-- Modal de resultados -->
+    <div id="resultado-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Resultados generados</h2>
+            <div class="modal-body" id="resultado-contenido">
+                <div id="optimization-result"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="download-btn" id="download-excel-btn">Descargar Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Popup de resumen-->
+    <div id="summary-popup" class="modal">
+      <div class="modal-content">
+        <!-- Cabecera del modal -->
+        <header class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <!-- Botón de cerrar -->
+          <button class="close-summary-popup" aria-label="Cerrar"
+                  style="background:none; border:none; font-size:1.5rem; cursor:pointer; line-height:1;">
+            &times;
+          </button>
+        </header>
+
+        <!-- Contenido (tabla) -->
+        <div id="summary-popup-content"></div>
+      </div>
+    </div>
+
+
+    <!-- Toast container -->
+    <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+    <!-- Script principal -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
