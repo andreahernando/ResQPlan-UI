@@ -1,0 +1,132 @@
+/* ———————————————————— */
+/* 1) Reglas generales (igual que tu otra página) */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.main-header {
+  width: 100%;
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+.main-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+/* ———————————————————— */
+/* 2) Panel de resultados: mismo estilo que .context-panel */
+.results-panel {
+  width: 95%;
+  max-width: 1000px;
+  background-color: #dfeffc;
+  border-radius: 10px;
+  padding: 20px 30px;
+  margin: 30px auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Título dentro del panel (opcional ajustar) */
+.results-panel h2 {
+  font-size: 20px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+
+/* ———————————————————— */
+/* 3) Contenedor de botones al fondo (igual que .button-container) */
+.button-container {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.button-container button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
+  font-weight: bold;
+}
+.button-container button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+/* ———————————————————— */
+/* 4) Filtro (igual que .filter-container / .filter-select) */
+.filter-container {
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.filter-select {
+  margin-left: 0.5rem;
+  padding: 0.25rem;
+  border: 1px solid #aacbe2;
+  border-radius: 8px;
+  background-color: #f8fbff;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* ———————————————————— */
+/* 5) Wrapper de la tabla: scroll interno + estilo */
+.table-wrapper {
+  width: 100%;
+  max-height: calc(70vh - 120px); /* ajusta según altura de panel y botones */
+  overflow: auto;
+  border: 1px solid #bcd3eb;
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #ffffff;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ———————————————————— */
+/* 6) Tabla fija */
+.resultado-grid {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin: 0; /* anulamos cualquier margin-top genérico */
+}
+.resultado-grid th,
+.resultado-grid td {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  word-wrap: break-word;
+  white-space: normal;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* Encabezado sticky */
+.table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background: #e6f2ff;
+  z-index: 2;
+}
+
+/* Celdas de estado */
+.active-cell { background-color: #d9ead3; }
+.rest-cell   { background-color: #f4cccc; }

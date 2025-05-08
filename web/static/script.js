@@ -162,12 +162,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Subir nuevo contexto: limpiar variables previas y reejecutar
           btnSave.addEventListener("click", () => {
-            sessionStorage.removeItem("variables");
-            continuar();
-          });
+              // 1) Borrar contexto viejo
+              sessionStorage.removeItem("variables");
+              // 2) Borrar restricciones viejas de sessionStorage
+              sessionStorage.removeItem("restricciones");
 
-          // Enter para guardar nuevo contexto
-          contextInput.addEventListener("keypress", onEnterSave);
+              // 3) Eliminar todos los <li class="restriccion-item">
+              document
+                .querySelectorAll(".restricciones-list .restriccion-item")
+                .forEach(li => li.remove());
+
+              // 4) (Opcional) volver a guardar el array vacío de restricciones
+              guardarRestricciones();
+
+              // 5) Reejecutar el flujo
+              continuar();
+            });
+
         });
 
         // ── Handler de “📄 Ver resumen” ──
@@ -229,22 +240,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
 
-      function onEnterSave(e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          document.getElementById("ok-button")?.click();
-        }
-      }
 
     if (okButton) okButton.addEventListener("click", continuar);
-    if (contextInput) {
-        contextInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                continuar();
-            }
-        });
-    }
+
 
     function guardarRestricciones() {
         const items = document.querySelectorAll(".restriccion-item");
@@ -536,137 +534,51 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    function parseKey(key) {
-        const regex = /\(\s*['"]?([^,'"]+)['"]?\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/;
-        const match = key.match(regex);
-        if (match) {
-            const entidad = match[1];
-            const dia = parseInt(match[2], 10);
-            const franja = parseInt(match[3], 10);
-            return { entidad, dia, franja };
-        } else {
-            return null;
-        }
-    }
 
     const optimizeButton = document.getElementById('optimize-button');
     if (optimizeButton) {
-        optimizeButton.addEventListener('click', function () {
-            if (procesandoRestricciones) {
-                showToast("warning", "Espera a que se terminen de procesar las restricciones antes de optimizar.");
-                return;
-            }
-            const restricciones = document.querySelector('.restricciones-list').children;
-            if (restricciones.length === 0) {
-                showToast("warning", "Por favor ingresa al menos una restricción antes de optimizar.");
-                return;
-            }
+      optimizeButton.addEventListener('click', async function () {
+        if (procesandoRestricciones) {
+          showToast("warning", "Espera a que terminen de procesar las restricciones antes de optimizar.");
+          return;
+        }
+        const items = document.querySelectorAll('.restriccion-item');
+        if (items.length === 0) {
+          showToast("warning", "Por favor ingresa al menos una restricción antes de optimizar.");
+          return;
+        }
 
-            mostrarPantallaCarga();
+        mostrarPantallaCarga();
 
-            const items = document.querySelectorAll('.restriccion-item');
-            const activeConstraints = [];
+        // Preparamos el array de restricciones activas
+        const activeConstraints = Array.from(items)
+          .filter(li => li.querySelector('.chk-rest').checked)
+          .map(li => li.querySelector('label').innerText);
 
-            items.forEach(li => {
-              const chk = li.querySelector('.chk-rest');
-              const texto = li.querySelector('label').innerText;
-              if (chk.checked) {
-                activeConstraints.push(texto);
-              }
-            });
+        try {
+          const res = await fetch('/api/optimize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active_constraints: activeConstraints })
+          });
+          const data = await res.json();
 
-            // luego lo envías en el body:
-            fetch('/api/optimize', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ active_constraints: activeConstraints })
-            })
+          // 1) Ocultamos overlay
+          loadingOverlay.style.display = "none";
 
+          // 2) Guardamos resultado en sessionStorage
+          sessionStorage.setItem('optimizationResult', JSON.stringify(data));
 
-                .then(response => response.json())
-                .then(data => {
-                    loadingOverlay.style.display = "none";
-                    showResultadoModal();
-
-                    const resultDiv = document.getElementById('optimization-result');
-                    resultDiv.style.display = 'block';
-                    resultDiv.innerHTML = '';
-
-                    if (typeof data.solution === 'object') {
-                        const resumen = {};
-                        const trabajadores = new Set();
-
-                        for (const [key, value] of Object.entries(data.solution)) {
-                            if (value > 0.5) {
-                                const parsed = parseKey(key);
-                                if (!parsed) continue;
-                                const { entidad, dia, franja } = parsed;
-                                trabajadores.add(entidad);
-
-                                if (!resumen[franja]) resumen[franja] = {};
-                                if (!resumen[franja][dia]) resumen[franja][dia] = [];
-                                resumen[franja][dia].push(entidad);
-                            }
-                        }
-
-                        const turnos = Math.max(...Object.keys(resumen).map(Number), 0) + 1;
-                        const dias = Math.max(...Object.values(resumen).flatMap(obj => Object.keys(obj).map(Number)), 0) + 1;
-
-                        // Filtro por trabajador
-                        const filtroContainer = document.createElement('div');
-                        filtroContainer.innerHTML = `
-                            <label for="worker-filter">Filtrar por trabajador:</label>
-                            <select id="worker-filter">
-                                <option value="Todos">Todos</option>
-                                ${[...trabajadores].map(t => `<option value="${t}">${t}</option>`).join('')}
-                            </select><br><br>`;
-                        resultDiv.appendChild(filtroContainer);
-
-                        const tablaContainer = document.createElement('div');
-                        resultDiv.appendChild(tablaContainer);
-
-                        function renderTabla(filtro) {
-                            const table = document.createElement('table');
-                            table.classList.add('resultado-grid');
-                            table.innerHTML = '<thead><tr><th>Turno \\ Día</th>' +
-                                Array.from({ length: dias }, (_, d) => `<th>Día ${d + 1}</th>`).join('') +
-                                '</tr></thead><tbody>';
-
-                            for (let t = 0; t < turnos; t++) {
-                                let row = `<tr><td><b>Turno ${t}</b></td>`;
-                                for (let d = 0; d < dias; d++) {
-                                    const entidades = resumen[t]?.[d] || [];
-                                    const filtradas = filtro === 'Todos' ? entidades : entidades.filter(e => e === filtro);
-                                    const texto = filtradas.length > 0 ? filtradas.join(' / ') : 'Descanso';
-                                    const color = texto === 'Descanso' ? '#f4cccc' : '#d9ead3';
-                                    row += `<td style="background:${color};text-align:center">${texto}</td>`;
-                                }
-                                row += '</tr>';
-                                table.innerHTML += row;
-                            }
-
-                            table.innerHTML += '</tbody>';
-                            tablaContainer.innerHTML = '';
-                            tablaContainer.appendChild(table);
-                        }
-
-                        const filtroSelect = filtroContainer.querySelector('#worker-filter');
-                        filtroSelect.addEventListener('change', () => renderTabla(filtroSelect.value));
-                        renderTabla('Todos');
-
-                        showToast("success", "Optimización completada.");
-                    } else {
-                        resultDiv.innerText = data.solution;
-                        showToast("success", "Resultado de la optimización disponible.");
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showToast("error", "Error al contactar con la API.");
-                    document.getElementById('optimization-result').innerText = "Error al contactar con la API.";
-                });
-        });
+          // 3) Redirigimos a la página de resultados
+          window.location.href = '/results';
+        } catch (error) {
+          loadingOverlay.style.display = "none";
+          console.error(error);
+          showToast("error", "Error al contactar con la API.");
+        }
+      });
     }
+
 
     if (contextInput) contextInput.focus();
     const constraintInput = document.getElementById('constraint');

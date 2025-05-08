@@ -119,3 +119,8 @@ def download_excel():
         return send_file(excel_path, as_attachment=True)
     else:
         return jsonify({"error": "Archivo no encontrado"}), 404
+
+@routes.route('/results')
+def results_page():
+    """Página que muestra los resultados de la optimización."""
+    return render_template('results.html')

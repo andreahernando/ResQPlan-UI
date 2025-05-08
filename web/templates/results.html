@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Resultados de Optimización</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='results.css') }}">
+</head>
+<body>
+  <header class="main-header">
+    <h1>ResQPlan</h1>
+  </header>
+
+  <main class="container">
+    <div class="panel results-panel">
+      <h2>Resultados de Optimización</h2>
+
+      <!-- Aquí inyectamos la tabla -->
+      <div id="results-content" class="results-content"></div>
+
+      <!-- Botones de acción -->
+      <div class="button-container" style="margin-top:1.5rem;">
+        <button id="download-excel-btn" class="download-btn">
+          <i class="fas fa-file-excel"></i> Descargar Excel
+        </button>
+        <button id="back-btn" class="back-btn">
+          <i class="fas fa-arrow-left"></i> Volver
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script src="{{ url_for('static', filename='results.js') }}"></script>
+</body>
+</html>

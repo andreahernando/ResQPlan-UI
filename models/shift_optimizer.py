@@ -68,7 +68,7 @@ class ShiftOptimizer:
     def agregar_restriccion(self, nl: str) -> bool:
         """Añade al modelo la restricción validada y activa."""
         print("\n🔍 Restricciones validadas:", self.restricciones_validadas.keys())
-        info = self.restricciones_validadas.get(nl)
+        info = self.restricciones_validadas
         if not info:
             print("⚠️  Restricción no validada previamente.")
             return False
