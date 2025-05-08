@@ -589,3 +589,33 @@ body {
   opacity: 0;
   transform: translateX(100%);
 }
+
+/* ———————————————————— */
+/* Panel “Restricciones Detectadas” (oculto por defecto) */
+#detected-panel {
+  display: none;               /* se muestra solo tras procesar contexto */
+  width: 95%;
+  max-width: 1000px;
+  background-color: #fff3cd;   /* fondo suave amarillo */
+  border: 1px solid #ffeeba;   /* borde acorde */
+  border-radius: 8px;
+  padding: 16px 24px;
+  margin: 20px auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+#detected-panel h3 {
+  margin-top: 0;
+  color: #856404;              /* texto marrón oscuro */
+  font-size: 18px;
+}
+#detected-constraints {
+  list-style: disc inside;
+  margin: 8px 0 0 0;
+  padding: 0;
+}
+#detected-constraints li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: #495057;
+}
+

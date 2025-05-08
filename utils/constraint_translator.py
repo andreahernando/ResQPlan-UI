@@ -18,20 +18,15 @@ def extract_variables_from_context(context: str) -> dict:
     A partir de un texto de gestión de turnos (colegio, hospital, emergencias, etc.) que incluye:
       - Descripción del problema (días, franjas horarias, objetivos).
       - Catálogo de recursos y roles (retenes, ambulancias, médicos, enfermeros, conductores, aulas, profesores, pacientes, etc.).
-    Extrae y devuelve un JSON con tres campos:
-      1) "variables": un diccionario obligatorio que contenga:
-         - "dias": int (número de días del horizonte).
-         - "franjas": int (número de franjas por día).
-         - "horarios": lista de strings con intervalos de cada franja.
-         - Cualquier otra lista de entidades relevantes (e.g., "lista_ambulancias", "lista_medicos", "lista_profesores").
-      2) "resources": un diccionario que indique la cantidad disponible de cada recurso,
-         por ejemplo: {"ambulancias": 3, "medicos": 5, "enfermeros": 4, "conductores": 6}.
-      3) "decision_variables": un string con código Python (Gurobi) para definir "self.x",
-         un dict comprehension cuyos índices recorren todas las colecciones extraídas en el orden:
-         (cada lista de entidades, "dias", "franjas").
+    Extrae y devuelve un JSON con cuatro campos:
+      1) "variables": {...}
+      2) "resources": {...}
+      3) "decision_variables": <str>
+      4) "detected_constraints": [<str>, ...]  ← **NUEVO**: restricciones detectadas en el texto de entrada
     ***Importante***: Devuelve **solo** el JSON resultado, sin explicaciones, comentarios o formato Markdown.
     """
     client = get_openai_client()
+
     prompt = (
         "Eres un ingeniero experto en modelos de programación lineal con Gurobi.\n"
         "Recibirás un texto que describe un problema de planificación de turnos "
@@ -40,7 +35,7 @@ def extract_variables_from_context(context: str) -> dict:
         " • Listas de entidades a asignar (retenes, profesores, médicos, ambulancias, etc.).\n"
         " • Cantidades de recursos disponibles.\n\n"
 
-        "Debes construir un ÚNICO objeto JSON con TRES claves obligatorias:\n"
+        "Debes construir un ÚNICO objeto JSON con TRES claves obligatorias:\n" 
         "1) \"variables\"  ⇒ diccionario que contenga SIEMPRE:\n"
         "      - \"dias\"      : <int>,\n"
         "      - \"franjas\"   : <int>,\n"
@@ -60,7 +55,11 @@ def extract_variables_from_context(context: str) -> dict:
         "   • Usa directamente 'model.addVar' y 'GRB.BINARY' (no 'self.model.GRB').\n"
         "   • El resultado de la comprensión debe ser un gurobipy.tupledict.\n"
         "   • Asegúrate de escribir saltos de línea REALES, no '\\n' escapados.\n\n"
-
+        "En el caso que detectes alguna restricción en el contexto (Oraciones meramente descriptivas (horarios, cantidades, desplazamientos) no se incluirán.),añade la siguiente clave (SOLO EN EL CASO QUE LO DETECTES):"
+       "4) \"detected_constraints\"  ⇒ lista de cadenas, **sin** convertirlas en código, " 
+        "   que contenga todas las oraciones del texto de entrada que parezcan "
+        "   restricciones en lenguaje natural.\n\n"
+        "Si no se detecta ninguna restricción válida, devuelve 'detected_constraints': []` o no incluyas esa clave."
         "Devuelve **solo** ese JSON, sin comentarios ni Markdown.\n\n"
         f"=== TEXTO DE ENTRADA ===\n{context}\n======================="
     )
@@ -69,24 +68,34 @@ def extract_variables_from_context(context: str) -> dict:
         try:
             resp = client.chat.completions.create(
                 model="o3-mini",
-                messages=[{"role":"user","content":prompt}]
+                messages=[{"role": "user", "content": prompt}]
             )
             content = resp.choices[0].message.content.strip()
             data = json.loads(content)
+
+            # Inicializar lista de restricciones detectadas si no viene
+            if 'detected_constraints' not in data:
+                data['detected_constraints'] = []
+
             # Validaciones básicas
-            if not all(k in data for k in ('variables','resources','decision_variables')):
+            if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):
                 raise ValueError("El JSON de salida no tiene las claves requeridas.")
+
             vars_dict = data['variables']
-            for key in ('dias','franjas','horarios'):
+            for key in ('dias', 'franjas', 'horarios'):
                 if key not in vars_dict:
                     raise ValueError(f"Falta la variable obligatoria '{key}' en 'variables'.")
+
             return data
+
         except json.JSONDecodeError as e:
             print(f"❌ JSON inválido intento {attempt+1}: {e}")
         except Exception as e:
             print(f"⚠️ Error en intento {attempt+1}: {e}")
             time.sleep(1)
+
     raise RuntimeError("❌ No se pudo extraer variables y recursos tras múltiples intentos.")
+
 
 
 def translate_constraint_to_code(nl_constraint: str, specs: dict) -> str:

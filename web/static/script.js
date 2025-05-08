@@ -6,56 +6,39 @@ document.addEventListener("DOMContentLoaded", function () {
     const wrapper      = document.querySelector(".textarea-with-button");
     const loadingOverlay = document.getElementById("loading-overlay");
 
+    // Panel y lista de restricciones detectadas
+    const detectedPanel = document.getElementById('detected-panel');
+    const detectedList  = document.getElementById('detected-constraints');
+
     let btnContainer = wrapper.querySelector('.context-btns');
     if (!btnContainer) {
       btnContainer = document.createElement('div');
       btnContainer.className = 'context-btns';
       wrapper.appendChild(btnContainer);
     }
+
     function showToast(type, message, duration = 3000) {
       const container = document.getElementById('toast-container');
       if (!container) return;
 
-      // Crear elemento
       const toast = document.createElement('div');
       toast.className = `toast ${type}`;
-
-      // Icono
       const icon = document.createElement('span');
       icon.className = 'icon';
       if (type === 'success') icon.textContent = '✔️';
       else if (type === 'error') icon.textContent = '❌';
       else if (type === 'warning') icon.textContent = '⚠️';
-
-      // Mensaje
       const msg = document.createElement('div');
       msg.className = 'message';
       msg.textContent = message;
-
-      // Botón cerrar
       const closeBtn = document.createElement('button');
       closeBtn.innerHTML = '&times;';
       closeBtn.setAttribute('aria-label', 'Cerrar');
-      closeBtn.style.marginLeft = '0.75rem';
-      closeBtn.style.background = 'transparent';
-      closeBtn.style.border = 'none';
-      closeBtn.style.color = 'inherit';
-      closeBtn.style.fontSize = '1.2rem';
-      closeBtn.style.cursor = 'pointer';
-      closeBtn.style.lineHeight = '1';
       closeBtn.addEventListener('click', () => hideToast(toast));
-
-      // Montar y mostrar
       toast.append(icon, msg, closeBtn);
       container.appendChild(toast);
-
-      // Forzar reflow y animar entrada
       requestAnimationFrame(() => toast.classList.add('show'));
-
-      // Auto-ocultar tras duration
       const hideTimeout = setTimeout(() => hideToast(toast), duration);
-
-      // Función de cierre
       function hideToast(el) {
         clearTimeout(hideTimeout);
         el.classList.remove('show');
@@ -63,7 +46,6 @@ document.addEventListener("DOMContentLoaded", function () {
         el.addEventListener('transitionend', () => el.remove(), { once: true });
       }
     }
-
 
     if (loadingOverlay) loadingOverlay.style.display = "none";
     function mostrarPantallaCarga() {
@@ -73,175 +55,151 @@ document.addEventListener("DOMContentLoaded", function () {
     function continuar() {
         const ctx = contextInput.value.trim();
         if (!ctx) {
-        showToast("warning", "Por favor ingresa algún contexto.");
-        return;
+          showToast("warning", "Por favor ingresa algún contexto.");
+          return;
         }
 
-        // ── Limpieza de botones previos ──
+        // ── Reinicio de UI previa ──
         ['edit-context', 'summary-context', 'cancel-edit', 'ok-button'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.remove();
+          const btn = document.getElementById(id);
+          if (btn) btn.remove();
         });
+        // Oculta sección de detecciones y lista limpia
+        if (detectedPanel) {
+          detectedPanel.style.display = 'none';
+          detectedList.innerHTML = '';
+        }
 
         mostrarPantallaCarga();
 
         fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input_data: ctx }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input_data: ctx }),
         })
         .then(res =>
-        res.json()
-           .then(p => ({ status: res.status, ok: res.ok, p }))
+          res.json()
+             .then(p => ({ status: res.status, ok: res.ok, p }))
         )
         .then(({ ok, status, p }) => {
-        // 1) Ocultar spinner
-        if (loadingOverlay) loadingOverlay.style.display = "none";
+          if (loadingOverlay) loadingOverlay.style.display = "none";
+          if (!ok) throw new Error(p.error || `HTTP ${status}`);
 
-        if (!ok) throw new Error(p.error || `HTTP ${status}`);
+          // 1) Guardar variables
+          sessionStorage.setItem("variables", JSON.stringify(p.result));
 
-        // 2) Guardar variables
-        sessionStorage.setItem("variables", JSON.stringify(p.result));
+          // 2) Mostrar restricciones detectadas (nuevo)
+          if (p.result.detected_constraints && p.result.detected_constraints.length) {
+            p.result.detected_constraints.forEach(nl => {
+              const li = document.createElement('li');
+              li.textContent = nl;
+              detectedList.appendChild(li);
+            });
+            detectedPanel.style.display = 'block';
+          }
 
-        // 3) Desactivar edición del textarea
-        contextInput.disabled = true;
+          // 3) Desactivar textarea
+          contextInput.disabled = true;
+          originalText = ctx;
 
-        // 4) Guardar texto para posible "Cancelar"
-        originalText = ctx;
+          // 4) Crear botones Editar / Resumen
+          const btnEdit    = document.createElement("button");
+          btnEdit.type     = "button";
+          btnEdit.id       = "edit-context";
+          btnEdit.textContent = "✏️ Editar";
+          const btnSummary = document.createElement("button");
+          btnSummary.type  = "button";
+          btnSummary.id    = "summary-context";
+          btnSummary.textContent = "📄 Ver resumen";
+          btnContainer.append(btnEdit, btnSummary);
 
-        // 5) Crear y añadir botones "Editar" y "Ver resumen"
-        const btnEdit    = document.createElement("button");
-        btnEdit.type     = "button";
-        btnEdit.id       = "edit-context";
-        btnEdit.textContent = "✏️ Editar";
+          // 5) Mostrar panel de restricciones manuales
+          const restrSection = document.querySelector(".container");
+          if (restrSection) restrSection.style.display = "flex";
+          showToast("success", "Contexto procesado correctamente.");
 
-        const btnSummary = document.createElement("button");
-        btnSummary.type  = "button";
-        btnSummary.id    = "summary-context";
-        btnSummary.textContent = "📄 Ver resumen";
-
-        btnContainer.append(btnEdit, btnSummary);
-
-        // 6) Mostrar panel de restricciones
-        const restrSection = document.querySelector(".container");
-        if (restrSection) restrSection.style.display = "flex";
-
-        showToast("success", "Contexto procesado correctamente.");
-
-        // ── Handler de “✏️ Editar” ──
-        btnEdit.addEventListener("click", () => {
-          // eliminar ambos botones
-          btnEdit.remove();
-          btnSummary.remove();
-
-          // reactivar textarea
-          contextInput.disabled = false;
-          contextInput.focus();
-
-          // crear "Subir" y "Cancelar"
-          const btnSave = document.createElement("button");
-          btnSave.type = "button";
-          btnSave.id = "ok-button";
-          btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
-
-          const btnCancel = document.createElement("button");
-          btnCancel.type = "button";
-          btnCancel.id = "cancel-edit";
-          btnCancel.textContent = "✖️ Cancelar";
-
-          btnContainer.append(btnSave, btnCancel);
-
-          // Cancelar edición: restaurar valor y volver a Editar/Resumen
-          btnCancel.addEventListener("click", () => {
-            contextInput.value    = originalText;
-            contextInput.disabled = true;
-            btnSave.remove();
-            btnCancel.remove();
-            btnContainer.append(btnEdit, btnSummary);
-          });
-
-          // Subir nuevo contexto: limpiar variables previas y reejecutar
-          btnSave.addEventListener("click", () => {
-              // 1) Borrar contexto viejo
+          // ✏️ Editar
+          btnEdit.addEventListener("click", () => {
+            btnEdit.remove();
+            btnSummary.remove();
+            contextInput.disabled = false;
+            contextInput.focus();
+            const btnSave = document.createElement("button");
+            btnSave.type = "button";
+            btnSave.id = "ok-button";
+            btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
+            const btnCancel = document.createElement("button");
+            btnCancel.type = "button";
+            btnCancel.id = "cancel-edit";
+            btnCancel.textContent = "✖️ Cancelar";
+            btnContainer.append(btnSave, btnCancel);
+            btnCancel.addEventListener("click", () => {
+              contextInput.value    = originalText;
+              contextInput.disabled = true;
+              btnSave.remove(); btnCancel.remove();
+              btnContainer.append(btnEdit, btnSummary);
+            });
+            btnSave.addEventListener("click", () => {
               sessionStorage.removeItem("variables");
-              // 2) Borrar restricciones viejas de sessionStorage
               sessionStorage.removeItem("restricciones");
-
-              // 3) Eliminar todos los <li class="restriccion-item">
-              document
-                .querySelectorAll(".restricciones-list .restriccion-item")
-                .forEach(li => li.remove());
-
-              // 4) (Opcional) volver a guardar el array vacío de restricciones
+              document.querySelectorAll(".restricciones-list .restriccion-item")
+                      .forEach(li => li.remove());
               guardarRestricciones();
-
-              // 5) Reejecutar el flujo
               continuar();
             });
-
-        });
-
-        // ── Handler de “📄 Ver resumen” ──
-        btnSummary.addEventListener("click", () => {
-          const data = JSON.parse(sessionStorage.getItem("variables") || "{}");
-          const { resources = {}, variables = {} } = data;
-
-          // Construye la tabla como antes
-          const table = document.createElement("table");
-          table.style.width = "100%";
-          table.style.borderCollapse = "collapse";
-          const thStyle = "border:1px solid #ccc;padding:6px;background:#e9f9ff;text-align:left;";
-          const tdStyle = "border:1px solid #ccc;padding:6px;";
-
-          const thead = document.createElement("thead");
-          thead.innerHTML = `
-            <tr>
-              <th style="${thStyle}">Clave</th>
-              <th style="${thStyle}">Valores</th>
-            </tr>`;
-          table.appendChild(thead);
-
-          const tbody = document.createElement("tbody");
-          [resources, variables].forEach(obj => {
-            Object.entries(obj).forEach(([key, vals]) => {
-              const tr = document.createElement("tr");
-              tr.innerHTML = `
-                <td style="${tdStyle}">${key}</td>
-                <td style="${tdStyle}">${Array.isArray(vals) ? vals.join(", ") : vals}</td>
-              `;
-              tbody.appendChild(tr);
-            });
           });
-          table.appendChild(tbody);
 
-          // Inserta en el popup
-          const popup = document.getElementById("summary-popup");
-          const content = document.getElementById("summary-popup-content");
-          content.innerHTML = "";
-          content.appendChild(table);
-          popup.style.display = "flex";
-
-          // Cierre
-          const closeBtn = popup.querySelector(".close-summary-popup");
-          closeBtn.onclick = () => popup.style.display = "none";
-          window.addEventListener("click", e => {
-            if (e.target === popup) popup.style.display = "none";
-          }, { once: true });
-        });
-
+          // 📄 Ver resumen
+          btnSummary.addEventListener("click", () => {
+            const data = JSON.parse(sessionStorage.getItem("variables") || "{}");
+            const { resources = {}, variables = {} } = data;
+            const table = document.createElement("table");
+            table.style.width = "100%";
+            table.style.borderCollapse = "collapse";
+            const thStyle = "border:1px solid #ccc;padding:6px;background:#e9f9ff;text-align:left;";
+            const tdStyle = "border:1px solid #ccc;padding:6px;";
+            const thead = document.createElement("thead");
+            thead.innerHTML = `
+              <tr>
+                <th style="${thStyle}">Clave</th>
+                <th style="${thStyle}">Valores</th>
+              </tr>`;
+            table.appendChild(thead);
+            const tbody = document.createElement("tbody");
+            [resources, variables].forEach(obj => {
+              Object.entries(obj).forEach(([key, vals]) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                  <td style="${tdStyle}">${key}</td>
+                  <td style="${tdStyle}">${Array.isArray(vals) ? vals.join(", ") : vals}</td>
+                `;
+                tbody.appendChild(tr);
+              });
+            });
+            table.appendChild(tbody);
+            const popup = document.getElementById("summary-popup");
+            const content = document.getElementById("summary-popup-content");
+            content.innerHTML = "";
+            content.appendChild(table);
+            popup.style.display = "flex";
+            const closeBtn = popup.querySelector(".close-summary-popup");
+            closeBtn.onclick = () => popup.style.display = "none";
+            window.addEventListener("click", e => {
+              if (e.target === popup) popup.style.display = "none";
+            }, { once: true });
+          });
 
         })
         .catch(err => {
-        // ocultar spinner en error
-        if (loadingOverlay) loadingOverlay.style.display = "none";
-        console.error(err);
-        showToast("error", err.message);
+          if (loadingOverlay) loadingOverlay.style.display = "none";
+          console.error(err);
+          showToast("error", err.message);
         });
-        }
-
-
+    }
 
     if (okButton) okButton.addEventListener("click", continuar);
+
+
 
 
     function guardarRestricciones() {
