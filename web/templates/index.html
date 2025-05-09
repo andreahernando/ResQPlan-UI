@@ -1,98 +1,109 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ResQPlan</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ResQPlan</title>
 
-    <!-- Estilos propios -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Estilos propios -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 
-    <!-- Font Awesome para los iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Font Awesome para los iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-    <header class="main-header">
-        <h1>ResQPlan</h1>
-    </header>
+  <header class="main-header">
+    <h1>ResQPlan</h1>
+  </header>
 
-    <!-- Panel de contexto -->
-    <div class="context-panel">
+  <div class="app-container">
+    <!-- LATERAL: proyectos -->
+    <aside id="projects-sidebar" class="panel">
+      <h2>Proyectos</h2>
+      <ul id="projects-list">
+        <!-- JS inyectará aquí la lista de proyectos guardados -->
+      </ul>
+      <button id="new-project-btn">+ Nuevo Proyecto</button>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+      <!-- Panel de contexto -->
+      <div class="context-panel">
         <h2>Describe el contexto en lenguaje natural</h2>
         <div class="textarea-with-button">
-            <textarea id="context" placeholder="Ejemplo: …"></textarea>
-            <!-- Aquí irá el contenedor de botones de contexto -->
-            <div class="context-btns">
-                <button type="button" id="ok-button"><i class="fas fa-arrow-up"></i> Subir</button>
-            </div>
+          <textarea id="context" placeholder="Ejemplo: …"></textarea>
+          <div class="context-btns">
+            <button type="button" id="ok-button">
+              <i class="fas fa-arrow-up"></i> Subir
+            </button>
+          </div>
         </div>
-    </div>
+      </div>
 
-    <!-- NUEVA SECCIÓN: Restricciones Detectadas -->
-    <div id="detected-panel" class="panel" style="display:none; margin-top: 20px;">
+      <!-- Restricciones Detectadas -->
+      <div id="detected-panel" class="panel" style="display:none; margin-top: 20px;">
         <h2>Restricciones Detectadas</h2>
         <ul id="detected-constraints">
-            <!-- Aquí el JS inyectará automáticamente las restricciones extraídas -->
+          <!-- Aquí el JS inyectará automáticamente las restricciones extraídas -->
         </ul>
-    </div>
-
-    <!-- Panel de restricciones -->
-    <div class="container">
-        <div class="panel">
-            <h2>Ingresar Restricciones</h2>
-            <textarea id="constraint" placeholder="Ejemplo: Ningún bombero puede trabajar más de 40 horas semanales..."></textarea>
-
-            <div class="button-container">
-                <button id="convert-button">Añadir</button>
-            </div>
-
-            <div id="constraint-result" class="result-box" style="display:none;"></div>
-        </div>
-
-        <div class="panel">
-            <h2>Restricciones Añadidas</h2>
-            <div class="restricciones-list"></div>
-
-            <div id="progress-container" style="display:none; margin-top:1rem;">
-                <label for="progress-bar" id="progress-label">Procesando 0 de 0…</label>
-                <progress id="progress-bar" value="0" max="0" style="width:100%;"></progress>
-            </div>
-
-            <div class="button-container">
-                <button id="optimize-button">Optimizar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Pantalla de carga -->
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-content">
-            <span class="spinner"></span>
-            <p>Procesando, por favor espera...</p>
-        </div>
-    </div>
-
-    <!-- Popup de resumen-->
-    <div id="summary-popup" class="modal">
-      <div class="modal-content">
-        <!-- Cabecera del modal -->
-        <header class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <!-- Botón de cerrar -->
-          <button class="close-summary-popup" aria-label="Cerrar"
-                  style="background:none; border:none; font-size:1.5rem; cursor:pointer; line-height:1;">
-            &times;
-          </button>
-        </header>
-
-        <!-- Contenido (tabla) -->
-        <div id="summary-popup-content"></div>
       </div>
+
+      <!-- Panel de restricciones manuales -->
+      <div class="container">
+        <div class="panel">
+          <h2>Ingresar Restricciones</h2>
+          <textarea id="constraint" placeholder="Ejemplo: Ningún bombero puede trabajar más de 40 horas semanales..."></textarea>
+
+          <div class="button-container">
+            <button id="convert-button">Añadir</button>
+          </div>
+
+          <div id="constraint-result" class="result-box" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Restricciones Añadidas</h2>
+          <div class="restricciones-list"></div>
+
+          <div id="progress-container" style="display:none; margin-top:1rem;">
+            <label for="progress-bar" id="progress-label">Procesando 0 de 0…</label>
+            <progress id="progress-bar" value="0" max="0" style="width:100%;"></progress>
+          </div>
+
+          <div class="button-container">
+            <button id="optimize-button">Optimizar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Pantalla de carga -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-content">
+      <span class="spinner"></span>
+      <p>Procesando, por favor espera...</p>
     </div>
+  </div>
 
-    <!-- Toast container -->
-    <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+  <!-- Popup de resumen -->
+  <div id="summary-popup" class="modal">
+    <div class="modal-content">
+      <header class="modal-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <button class="close-summary-popup" aria-label="Cerrar"
+                style="background:none; border:none; font-size:1.5rem; cursor:pointer; line-height:1;">
+          &times;
+        </button>
+      </header>
+      <div id="summary-popup-content"></div>
+    </div>
+  </div>
 
-    <!-- Script principal -->
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <!-- Toast container -->
+  <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Script principal -->
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
