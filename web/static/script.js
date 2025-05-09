@@ -10,10 +10,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // Panel y lista de restricciones detectadas
     const detectedPanel = document.getElementById('detected-panel');
     const detectedList  = document.getElementById('detected-constraints');
-    // Elementos del sidebar de proyectos
-    const projectsList   = document.getElementById('projects-list');
-    const newProjectBtn  = document.getElementById('new-project-btn');
-
 
     // Toggle sidebar
     const sidebar   = document.getElementById("project-sidebar");
@@ -321,88 +317,6 @@ document.addEventListener("DOMContentLoaded", function () {
       wrapper.appendChild(btnContainer);
     }
 
-        // ——— Funciones para el sidebar de proyectos ———
-
-    function renderProjectList() {
-        const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-        const current  = localStorage.getItem('currentProject');
-        projectsList.innerHTML = '';
-        projects.forEach(name => {
-            const li = document.createElement('li');
-            li.textContent = name;
-            if (name === current) li.classList.add('active');
-            li.onclick = () => selectProject(name);
-            projectsList.appendChild(li);
-        });
-    }
-
-    function createNewProject() {
-    const name = prompt("Nombre del nuevo proyecto:");
-    if (!name) return;
-
-    // 1) Recuperar y actualizar la lista de proyectos
-    let projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    if (projects.includes(name)) {
-        alert("Ya existe un proyecto con ese nombre.");
-        return;
-    }
-    projects.push(name);
-    localStorage.setItem('projects', JSON.stringify(projects));
-
-    // 2) Inicializa datos del proyecto
-    localStorage.setItem(`ctx_${name}`, JSON.stringify(""));     // contexto vacío
-    localStorage.setItem(`restrs_${name}`, JSON.stringify([]));  // restricciones vacías
-
-    // ─────────────── AÑADE AQUÍ EL PUNTO 3 ───────────────
-    // 3) Inicializa también las variables extraídas (serán llenadas tras /api/translate)
-    localStorage.setItem(`vars_${name}`, JSON.stringify({}));
-    // ────────────────────────────────────────────────────
-
-    // 4) Marca este proyecto como activo y refresca la UI
-    localStorage.setItem('currentProject', name);
-    renderProjectList();
-    loadProject(name);
-}
-
-
-    function selectProject(name) {
-        localStorage.setItem('currentProject', name);
-        renderProjectList();
-        loadProject(name);
-    }
-
-    function loadProject(name) {
-        // carga contexto
-        const ctx = JSON.parse(localStorage.getItem(`ctx_${name}`) || '""');
-        contextInput.value = ctx;
-        originalText = ctx;
-        // ── Restaura las variables/specs extraídas para este proyecto ──
-        const savedVars = localStorage.getItem(`vars_${name}`);
-        if (savedVars) {
-            sessionStorage.setItem('variables', savedVars);
-        }
-
-        // carga restricciones manuales
-        const restrs = JSON.parse(localStorage.getItem(`restrs_${name}`) || '[]');
-        const listEl = document.querySelector('.restricciones-list');
-        listEl.innerHTML = '';
-        restrs.forEach(txt => addManualRestrictionToUI(txt, true));
-        // oculta panel de detectadas
-        if (detectedPanel) detectedPanel.style.display = 'none';
-        // muestra UI principal
-        document.querySelector('.container').style.display = 'flex';
-    }
-
-    function saveCurrentProject() {
-        const name = localStorage.getItem('currentProject');
-        if (!name) return;
-        localStorage.setItem(`ctx_${name}`, JSON.stringify(contextInput.value.trim()));
-        const restrs = Array.from(document.querySelectorAll('.restriccion-item label'))
-            .map(label => label.innerText);
-        localStorage.setItem(`restrs_${name}`, JSON.stringify(restrs));
-    }
-    // ————————————————————————————————————————
-
     function showToast(type, message, duration = 3000) {
       const container = document.getElementById('toast-container');
       if (!container) return;
@@ -471,13 +385,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (loadingOverlay) loadingOverlay.style.display = "none";
           if (!ok) throw new Error(p.error || `HTTP ${status}`);
 
-          saveCurrentProject();
           // 1) Guardar variables
-          // 1) Guardar variables EN localStorage, por proyecto
-          const project = localStorage.getItem('currentProject');
-          // actualizamos la key vars_<nombreProyecto>
-          localStorage.setItem(`vars_${project}`, JSON.stringify(p.result));
-
+          sessionStorage.setItem("variables", JSON.stringify(p.result));
 
           // 2) Mostrar restricciones detectadas (nuevo)
           if (p.result.detected_constraints && p.result.detected_constraints.length) {
@@ -536,17 +445,13 @@ document.addEventListener("DOMContentLoaded", function () {
               document.querySelectorAll(".restricciones-list .restriccion-item")
                       .forEach(li => li.remove());
               guardarRestricciones();
-              // ── Persiste las restricciones manuales en el proyecto actual ──
-              saveCurrentProject();
-
               continuar();
             });
           });
 
           // 📄 Ver resumen
           btnSummary.addEventListener("click", () => {
-            const project = localStorage.getItem('currentProject');
-            const data    = JSON.parse(localStorage.getItem(`vars_${project}`) || "{}");
+            const data = JSON.parse(sessionStorage.getItem("variables") || "{}");
             const { resources = {}, variables = {} } = data;
             const table = document.createElement("table");
             table.style.width = "100%";
@@ -932,18 +837,8 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-        // botón para crear nuevo proyecto
-    newProjectBtn.addEventListener('click', createNewProject);
-
-    // inicialización al cargar la página:
-    renderProjectList();
-    const initial = localStorage.getItem('currentProject');
-
-    if (initial) loadProject(initial);
 
     if (contextInput) contextInput.focus();
     const constraintInput = document.getElementById('constraint');
     if (constraintInput) constraintInput.focus();
-
 });
-
