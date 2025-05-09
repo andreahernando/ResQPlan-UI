@@ -619,3 +619,104 @@ body {
   color: #495057;
 }
 
+/* Sidebar base */
+.project-sidebar {
+  position: fixed;
+  top: 0; left: 0;
+  width: 250px; height: 100%;
+  background: #fff;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease-in-out;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Cuando está abierto */
+.project-sidebar.open {
+  transform: translateX(0);
+}
+
+/* Encabezado del sidebar */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* Contenido principal */
+.sidebar-content {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* Prompt de nuevo proyecto, oculto por defecto */
+.new-prompt {
+  display: none;
+  margin-top: 0.5rem;
+}
+
+/* Lista de proyectos */
+.project-list {
+  list-style: none;
+  margin: 1rem 0;
+  padding: 0;
+}
+.project-list li {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+.project-list li:hover {
+  background: #f0f0f0;
+}
+
+/* Footer con botones */
+.sidebar-footer {
+  padding: 1rem;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Botón hamburguesa a la izquierda */
+.sidebar-toggle {
+  order: -1;           /* se muestra antes que el <h1> */
+  margin-right: 1rem;  /* separación con el título */
+  margin-left: 0;      /* asegúrate de no tener margen izquierdo */
+  background: none;    /* o tu color de preferencia */
+  color: white;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+/* Botón cerrar dentro del sidebar */
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* Botón “Nuevo proyecto” */
+.new-project-btn {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  text-align: left;
+  cursor: pointer;
+}
+.new-project-btn:hover {
+  background: #0056b3;
+}
+
