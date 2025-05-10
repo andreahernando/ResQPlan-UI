@@ -1,18 +1,14 @@
-from flask import Blueprint, jsonify, request, render_template, session, send_file
-from uuid import uuid4  # — NUEVO —
+from flask import Blueprint, jsonify, request, render_template, session, send_file, current_app
+from uuid import uuid4
 from utils.constraint_translator import extract_variables_from_context, translate_constraint_to_code
 from models.shift_optimizer import ShiftOptimizer
 import gurobipy as gp
 from utils.result_visualizer import exportar_resultados
 import os
 
-# Crear un Blueprint para las rutas
 routes = Blueprint('routes', __name__, template_folder='../web/templates')
 
-# Constante de sesión para proyectos          — NUEVO —
-PROJECTS_KEY = "projects"
-
-global_model = None  # Variable global para almacenar el modelo
+global_model = None  # Variable global para models que vienen de /api/translate
 
 
 @routes.route('/')
@@ -21,105 +17,153 @@ def index():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Gestión de Proyectos                                                        — NUEVO —
+# Gestión de Proyectos
 # ─────────────────────────────────────────────────────────────────────────────
 
 @routes.route('/api/projects', methods=['GET'])
 def list_projects():
-    """Devuelve la lista de proyectos guardados en sesión."""
-    projects = session.get(PROJECTS_KEY, {})
-    return jsonify({
-        "projects": [
-            {"id": pid, "name": info["name"]}
-            for pid, info in projects.items()
-        ]
-    })
+    projects = list(current_app.mongo.db.projects.find({}, {"_id": 0}))
+    return jsonify({"projects": projects})
 
 
 @routes.route('/api/projects', methods=['POST'])
 def create_project():
-    """Crea un nuevo proyecto con snapshot de variables y restricciones actuales."""
     data = request.get_json() or {}
-    name = data.get("name", "Untitled")
-    projects = session.setdefault(PROJECTS_KEY, {})
     pid = str(uuid4())
-    projects[pid] = {
-        "name": name,
-        "variables": session.get("variables", {}),
-        "restricciones": session.get("restricciones", [])
+    specs = session.get('variables', {})
+    manual = session.get('restricciones', [])
+
+    # Tomamos el shift_store si existe, sino lista vacía
+    shift = getattr(current_app, "shift_store", None)
+    vc_list = []
+    if shift:
+        for texto, info in shift.restricciones_validadas.items():
+            vc_list.append({
+                "texto": texto,
+                "code": info["code"],
+                "activa": info["activa"]
+            })
+
+    project = {
+        "id": pid,
+        "name": data.get("name", "Untitled"),
+        "context": data.get("context", ""),
+        "detectedConstraints": data.get("detectedConstraints", []),
+        "manualConstraints": manual,
+        "variables": specs,
+        "validatedConstraints": vc_list
     }
-    session.modified = True
-    return jsonify({"id": pid, "name": name}), 201
+
+    current_app.mongo.db.projects.insert_one(project)
+    print(f"[DEBUG CREATE] Proyecto creado id={pid}, name={project['name']}, validated={vc_list}")
+    return jsonify({"id": pid, "name": project["name"]}), 201
+
 
 
 @routes.route('/api/projects/<pid>', methods=['GET'])
 def load_project(pid):
-    """Carga un proyecto existente y restaura variables y restricciones en sesión."""
-    projects = session.get(PROJECTS_KEY, {})
-    proj = projects.get(pid)
-    if not proj:
+    project = current_app.mongo.db.projects.find_one({"id": pid}, {"_id": 0})
+    if not project:
         return jsonify({"error": "Proyecto no encontrado"}), 404
-    session["variables"] = proj["variables"]
-    session["restricciones"] = proj["restricciones"]
+
+    # Debug de lo que llega
+    print(f"[DEBUG LOAD] Proyecto id={pid} name={project.get('name')}")
+    print(f"  Variables: {project.get('variables')}")
+    print(f"  ManualConstraints: {project.get('manualConstraints')}")
+    print(f"  ValidatedConstraints raw: {project.get('validatedConstraints')}")
+
+    # Restaurar sesión
+    session['variables'] = project.get('variables', {})
+    session['restricciones'] = project.get('manualConstraints', [])
     session.modified = True
-    return jsonify({"id": pid, "name": proj["name"]})
+
+    # Reconstruir modelo en backend
+    specs = project.get('variables', {})
+    current_app.shift_store = ShiftOptimizer(specs)
+    print(f"[DEBUG LOAD] Modelo reseteado con {len(current_app.shift_store.decision_vars)} vars")
+
+    # Aplicar cada validación guardada
+    for entry in project.get('validatedConstraints', []):
+        nl = entry["texto"]
+        current_app.shift_store.restricciones_validadas[nl] = {
+            "code": entry["code"],
+            "activa": entry["activa"]
+        }
+        print(f"[DEBUG LOAD] Restaurando '{nl}' activa={entry['activa']}")
+        if entry["activa"]:
+            ok = current_app.shift_store.agregar_restriccion(nl)
+            print(f"[DEBUG LOAD] Agregada '{nl}': {ok}")
+
+    print(f"[DEBUG LOAD] Modelo final: {len(current_app.shift_store.model.getVars())} vars, "
+          f"{len(current_app.shift_store.model.getConstrs())} constrs")
+    return jsonify(project)
+
+
+@routes.route('/api/projects/<pid>', methods=['PUT'])
+def update_project(pid):
+    data = request.get_json() or {}
+
+    # Reconstruir la lista para almacenar
+    vc_list = [
+        {"texto": t, "code": info["code"], "activa": info["activa"]}
+        for t, info in current_app.shift_store.restricciones_validadas.items()
+    ]
+    print(f"[DEBUG UPDATE] Antes de grabar validatedConstraints={vc_list}")
+
+    update = {
+        "name": data.get("name"),
+        "context": data.get("context"),
+        "detectedConstraints": data.get("detectedConstraints"),
+        "manualConstraints": data.get("manualConstraints"),
+        "variables": data.get("variables"),
+        "validatedConstraints": vc_list
+    }
+    result = current_app.mongo.db.projects.update_one({"id": pid}, {"$set": update})
+    if result.matched_count == 0:
+        return jsonify({"error": "Proyecto no encontrado"}), 404
+
+    print(f"[DEBUG UPDATE] Proyecto id={pid} actualizado")
+    return jsonify({"success": True})
 
 
 @routes.route('/api/projects/<pid>', methods=['DELETE'])
 def delete_project(pid):
-    """Borra un proyecto de la sesión."""
-    projects = session.get(PROJECTS_KEY, {})
-    if projects.pop(pid, None) is None:
+    result = current_app.mongo.db.projects.delete_one({"id": pid})
+    if result.deleted_count == 0:
         return jsonify({"error": "Proyecto no encontrado"}), 404
-    session.modified = True
-    return jsonify({"success": True})
-# ─────────────────────────────────────────────────────────────────────────────
 
+    print(f"[DEBUG DELETE] Proyecto id={pid} eliminado")
+    return jsonify({"success": True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Otras rutas existentes (translate, convert, edit_constraint, optimize…)
+# ─────────────────────────────────────────────────────────────────────────────
 
 @routes.route('/api/translate', methods=['POST'])
 def translate():
-    """Procesa el contexto en lenguaje natural, extrae variables y crea el modelo."""
     global global_model
     data = request.get_json()
     context = data.get('input_data')
-
     if not context:
         return jsonify({"error": "No se proporcionaron datos de entrada"}), 400
-
     variables = extract_variables_from_context(context)
     session['variables'] = variables
-
     global_model = ShiftOptimizer(variables)
-
     return jsonify({"result": variables})
 
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():
-    """Traduce una restricción en lenguaje natural a código Gurobi y la valida."""
     data = request.get_json()
-    nl_constraint = data.get('constraint')
-
-    if not nl_constraint:
-        return jsonify({"error": "No se proporcionó ninguna restricción"}), 400
-
-    variables = session.get('variables', {})
-
-    if not variables:
-        return jsonify({
-            "error": "No se encontraron variables en la sesión. Traduce primero el contexto."
-        }), 400
-
-    translated_code = translate_constraint_to_code(nl_constraint, variables["variables"])
-
+    nl = data.get('constraint')
+    code = translate_constraint_to_code(nl, session['variables']['variables'])
     valid = False
-    if global_model:
-        valid = global_model.validar_restriccion(nl_constraint, translated_code)
-
-    return jsonify({
-        "code": translated_code,
-        "valid": valid
-    })
+    if hasattr(current_app, 'shift_store'):
+        valid = current_app.shift_store.validar_restriccion(nl, code)
+        print(f"[DEBUG CONVERT] Now restricciones_validadas keys: "
+              f"{list(current_app.shift_store.restricciones_validadas.keys())}")
+    return jsonify({"code": code, "valid": valid})
 
 
 @routes.route("/api/edit_constraint", methods=["POST"])
@@ -141,41 +185,45 @@ def edit_constraint():
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
     """Activa las restricciones seleccionadas y ejecuta la optimización."""
-    global global_model
-    if not global_model:
+    # Verificar que el optimizador esté inicializado
+    if not hasattr(current_app, 'shift_store'):
         return jsonify({"error": "No se encontró ningún modelo."}), 400
+    optimizer: ShiftOptimizer = current_app.shift_store
 
     data = request.get_json() or {}
     active_list = data.get('active_constraints', [])
 
-    # Desactiva todas
-    for nl, info in global_model.restricciones_validadas.items():
+    # Desactivar todas las restricciones
+    for nl, info in optimizer.restricciones_validadas.items():
         info["activa"] = False
 
-    # Activa solo las seleccionadas
+    # Activar solo las seleccionadas
     for nl in active_list:
-        if nl in global_model.restricciones_validadas:
-            global_model.restricciones_validadas[nl]["activa"] = True
+        if nl in optimizer.restricciones_validadas:
+            optimizer.restricciones_validadas[nl]["activa"] = True
 
-    # Ejecuta la optimización
-    global_model.optimizar()
+    # Ejecutar la optimización
+    optimizer.optimizar()
 
-    if global_model.model.status == gp.GRB.OPTIMAL:
+    # Construir la solución
+    if optimizer.model.status == gp.GRB.OPTIMAL:
         solution = {
             str(key): var.X
-            for key, var in global_model.decision_vars.items()
+            for key, var in optimizer.decision_vars.items()
             if var.X > 0.5
         }
     else:
         solution = "No se encontró una solución óptima."
 
+    # Exportar resultados a Excel
     variables = session.get('variables', {})
-    exportar_resultados(global_model.model, global_model.decision_vars, variables)
+    exportar_resultados(optimizer.model, optimizer.decision_vars, variables)
 
     return jsonify({
         "solution": solution,
-        "status": global_model.model.status
+        "status": optimizer.model.status
     })
+
 
 
 @routes.route('/api/download_excel')

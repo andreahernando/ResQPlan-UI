@@ -1,313 +1,221 @@
 document.addEventListener("DOMContentLoaded", function () {
-    let procesandoRestricciones = false;
-    let originalText  = "";
-    const okButton = document.getElementById("ok-button");
-    const contextInput = document.getElementById("context");
-    const wrapper      = document.querySelector(".textarea-with-button");
-    const loadingOverlay = document.getElementById("loading-overlay");
-    if (loadingOverlay) loadingOverlay.style.display = "none";
+  let procesandoRestricciones = false;
+  let originalText = "";
+  const okButton = document.getElementById("ok-button");
+  const contextInput = document.getElementById("context");
+  const wrapper = document.querySelector(".textarea-with-button");
+  const loadingOverlay = document.getElementById("loading-overlay");
+  if (loadingOverlay) loadingOverlay.style.display = "none";
 
-    // Panel y lista de restricciones detectadas
-    const detectedPanel = document.getElementById('detected-panel');
-    const detectedList  = document.getElementById('detected-constraints');
+  // Panel y lista de restricciones detectadas
+  const detectedPanel = document.getElementById('detected-panel');
+  const detectedList = document.getElementById('detected-constraints');
 
-    // Toggle sidebar
-    const sidebar   = document.getElementById("project-sidebar");
-    const btnToggle = document.getElementById("toggle-sidebar");
-    const btnClose  = document.getElementById("close-sidebar");
-
-    btnToggle.addEventListener("click", () => {
-      sidebar.classList.add("open");
-    });
-
-    btnClose.addEventListener("click", () => {
+  // Toggle sidebar
+  const sidebar = document.getElementById("project-sidebar");
+  const btnToggle = document.getElementById("toggle-sidebar");
+  const btnClose = document.getElementById("close-sidebar");
+  btnToggle.addEventListener("click", () => sidebar.classList.add("open"));
+  btnClose.addEventListener("click", () => sidebar.classList.remove("open"));
+  window.addEventListener("click", (e) => {
+    if (!sidebar.contains(e.target) && !btnToggle.contains(e.target)) {
       sidebar.classList.remove("open");
+    }
+  });
+
+  // Referencias a los elementos de la UI
+  const saveProjectBtn = document.getElementById("save-project");
+  const deleteProjectBtn = document.getElementById("delete-project");
+  const newPrompt = document.getElementById("new-project-prompt");
+  const newNameInput = document.getElementById("new-project-name");
+  const createProjectBtn = document.getElementById("create-project");
+  const cancelCreateBtn = document.getElementById("cancel-create");
+  const projectList = document.getElementById("project-list");
+
+  let currentProjectId = null;
+  let currentProjectName = "";
+  let currentGurobiModel = null;
+
+  // — Función auxiliar para parsear expresiones lineales —
+  function parseLinExpr(exprStr, varsMap) {
+    const expr = new Gurobi.LinExpr();
+    exprStr.replace(/\s+/g, '').split('+').forEach(term => {
+      const [coefStr, varName] = term.split('*');
+      const coef = parseFloat(coefStr);
+      if (varsMap[varName]) expr.addTerm(coef, varsMap[varName]);
+    });
+    return expr;
+  }
+
+  // — Reconstruir modelo Gurobi desde el estado serializado —
+  function rebuildGurobiModel(state) {
+    const model = new Gurobi.Model();
+    const varsMap = {};
+
+    // 1) Variables
+    state.vars.forEach(vs => {
+      const v = model.addVar(vs.lb, vs.ub, 0, vs.type, vs.name);
+      varsMap[vs.name] = v;
     });
 
-    // También puedes cerrar al hacer click fuera del sidebar:
-    window.addEventListener("click", (e) => {
-      if (!sidebar.contains(e.target) && !btnToggle.contains(e.target)) {
-        sidebar.classList.remove("open");
-      }
+    // 2) Restricciones
+    state.cons.forEach(cs => {
+      const lin = parseLinExpr(cs.expr, varsMap);
+      model.addConstr(lin, cs.sense, cs.rhs);
     });
 
+    // 3) Objetivo
+    const obj = parseLinExpr(state.objective, varsMap);
+    model.setObjective(obj, state.sense);
 
-    // ————— Gestión de Proyectos (localStorage) —————
-
-    // Helpers para localStorage
-    function listProjects() {
-      return JSON.parse(localStorage.getItem("resqplan_projects") || "[]");
-    }
-    function saveProjectList(list) {
-      localStorage.setItem("resqplan_projects", JSON.stringify(list));
-    }
-    function saveProjectData(project) {
-      localStorage.setItem(`resqplan_project_${project.id}`, JSON.stringify(project));
-    }
-    function loadProjectData(id) {
-      const raw = localStorage.getItem(`resqplan_project_${id}`);
-      if (!raw) return {
-        id,
-        name: listProjects().find(p=>p.id===id)?.name||"",
-        context: "",
-        detectedConstraints: [],
-        manualConstraints: [],
-        variables: {}
-      };
-      return JSON.parse(raw);
-    }
-
-    function deleteProject(id) {
-      localStorage.removeItem(`resqplan_project_${id}`);
-      const list = listProjects().filter(p => p.id !== id);
-      saveProjectList(list);
-    }
-
-    // Referencias a los elementos de la UI
-    const saveProjectBtn = document.getElementById("save-project");
-    const deleteProjectBtn = document.getElementById("delete-project");
-    const newPrompt = document.getElementById("new-project-prompt");
-    const newNameInput = document.getElementById("new-project-name");
-    const createProjectBtn = document.getElementById("create-project");
-    const cancelCreateBtn = document.getElementById("cancel-create");
-
-    let currentProjectId = null;
-    let currentProjectName = "";
-    let currentGurobiModel    = null;
-
-    // — Función auxiliar para parsear expresiones lineales —
-    function parseLinExpr(exprStr, varsMap) {
-      const expr = new Gurobi.LinExpr();
-      exprStr
-        .replace(/\s+/g, '')
-        .split('+')
-        .forEach(term => {
-          const [coefStr, varName] = term.split('*');
-          const coef = parseFloat(coefStr);
-          if (varsMap[varName]) expr.addTerm(coef, varsMap[varName]);
-        });
-      return expr;
-    }
-
-    // — Reconstruir modelo Gurobi desde el estado serializado —
-    function rebuildGurobiModel(state) {
-      const model = new Gurobi.Model();
-      const varsMap = {};
-
-      // 1) Variables
-      state.vars.forEach(vs => {
-        const v = model.addVar(vs.lb, vs.ub, 0, vs.type, vs.name);
-        varsMap[vs.name] = v;
-      });
-
-      // 2) Restricciones
-      state.cons.forEach(cs => {
-        const lin = parseLinExpr(cs.expr, varsMap);
-        model.addConstr(lin, cs.sense, cs.rhs);
-      });
-
-      // 3) Objetivo
-      const obj = parseLinExpr(state.objective, varsMap);
-      model.setObjective(obj, state.sense);
-
-      model.update();
-      return model;
-    }
+    model.update();
+    return model;
+  }
 
 
-    function refreshProjectOptions() {
-      const projectList = document.getElementById("project-list");
-      projectList.innerHTML = "";
+  // ——— API calls ———
+  async function listProjects() {
+    const res = await fetch("/api/projects");
+    const { projects } = await res.json();
+    return projects;
+  }
 
-      listProjects().forEach(p => {
-        const li = document.createElement("li");
-        li.textContent = p.name;
-        li.dataset.id = p.id;
-        li.addEventListener("click", () => {
-          const proj = loadProjectData(p.id);
-          if (!proj) return showToast("error", "Error cargando proyecto");
-
-          // ——— Recarga de la UI —————————————————————————————————————
-          currentProjectId   = proj.id;
-          currentProjectName = proj.name;
-          contextInput.value = proj.context || "";
-
-          // restricciones detectadas
-          detectedList.innerHTML = "";
-          (proj.detectedConstraints || []).forEach(nl => {
-            const item = document.createElement("li");
-            item.textContent = nl;
-            detectedList.appendChild(item);
-          });
-          detectedPanel.style.display = proj.detectedConstraints?.length ? "block" : "none";
-
-          // restricciones manuales
-          sessionStorage.setItem("restricciones", JSON.stringify(proj.manualConstraints || []));
-          document.querySelector(".restricciones-list").innerHTML = "";
-          cargarRestricciones();
-
-          // variables
-          sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
-
-          saveProjectBtn.disabled   = false;
-          deleteProjectBtn.disabled = false;
-          showToast("info", `Proyecto “${proj.name}” cargado`);
-          sidebar.classList.remove("open");
-
-          currentGurobiModel = rebuildGurobiModel(proj.gurobiState);
-          window.currentGurobiModel = currentGurobiModel;
-          showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
-
-
-          // Restricciones
-          proj.gurobiState.cons.forEach(cs => {
-            const linExpr = parseLinExpr(cs.expr, varsMap);
-            model.addConstr(linExpr, cs.sense, cs.rhs);
-          });
-
-          // Objetivo
-          const objExpr = parseLinExpr(proj.gurobiState.objective, varsMap);
-          model.setObjective(objExpr, proj.gurobiState.sense);
-
-          // Actualizar modelo
-          model.update();
-          currentGurobiModel = model;
-          window.currentGurobiModel = model;
-          showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
-        });
-
-        projectList.appendChild(li);
-      });
-    }
-
-    // Inicializar opciones
-    refreshProjectOptions();
-
-    document.getElementById("new-project-btn").addEventListener("click", () => {
-      newPrompt.style.display = "block";
-    });
-
-    createProjectBtn.addEventListener("click", () => {
-      const name = newNameInput.value.trim();
-      if (!name) return showToast("warning", "Ponle un nombre al proyecto");
-
-      const id = Date.now().toString();
-      const list = listProjects();
-      list.push({ id, name });
-      saveProjectList(list);
-
-      saveProjectData({
-        id,
+  async function createProject(name) {
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
         name,
         context: "",
         detectedConstraints: [],
         manualConstraints: [],
         variables: {},
         gurobiState: { vars: [], cons: [], objective: "0", sense: 1 }
+      })
+    });
+    return res.json();
+  }
+
+  async function loadProject(id) {
+    const res = await fetch(`/api/projects/${id}`);
+    return res.json();
+  }
+
+  async function updateProject(proj) {
+    await fetch(`/api/projects/${proj.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proj)
+    });
+  }
+
+  async function deleteProject(id) {
+    await fetch(`/api/projects/${id}`, { method: "DELETE" });
+  }
+
+  // ——— Refrescar la lista de proyectos en la UI ———
+  async function refreshProjectOptions() {
+    projectList.innerHTML = "";
+    const projects = await listProjects();
+    projects.forEach(p => {
+      const li = document.createElement("li");
+      li.textContent = p.name;
+      li.dataset.id = p.id;
+      li.addEventListener("click", async () => {
+        const proj = await loadProject(p.id);
+        if (proj.error) return showToast("error", "Error cargando proyecto");
+
+        // ——— Recarga de la UI —————————————————————————————————————
+        currentProjectId = proj.id;
+        currentProjectName = proj.name;
+        contextInput.value = proj.context || "";
+
+        detectedList.innerHTML = "";
+        (proj.detectedConstraints || []).forEach(nl => {
+          const item = document.createElement("li");
+          item.textContent = nl;
+          detectedList.appendChild(item);
+        });
+        detectedPanel.style.display = proj.detectedConstraints?.length ? "block" : "none";
+
+        sessionStorage.setItem("restricciones", JSON.stringify(proj.manualConstraints || []));
+        document.querySelector(".restricciones-list").innerHTML = "";
+        cargarRestricciones();
+
+        sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
+
+        saveProjectBtn.disabled = false;
+        deleteProjectBtn.disabled = false;
+        showToast("info", `Proyecto “${proj.name}” cargado`);
+        sidebar.classList.remove("open");
+
+        currentGurobiModel = rebuildGurobiModel(proj.gurobiState);
+        window.currentGurobiModel = currentGurobiModel;
+        showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
       });
-
-      // Limpia UI…
-      currentProjectId   = id;
-      currentProjectName = name;
-      contextInput.value = "";
-      detectedList.innerHTML = "";
-      document.querySelector(".restricciones-list").innerHTML = "";
-      sessionStorage.clear();
-      newPrompt.style.display = "none";
-
-      // 1) Primero refresca la lista y abre el panel
-      refreshProjectOptions();
-      sidebar.classList.add("open");
-      showToast("success", `Proyecto “${name}” creado`);
-
-      // 2) Después, inicializa el modelo Gurobi (fuera del hilo crítico)
-      setTimeout(() => {
-        currentGurobiModel = new Gurobi.Model();
-        // si necesitas notificar:
-        showToast("info", `Modelo Gurobi inicializado para “${name}”`);
-      }, 0);
-
-      // 3) Habilita botones
-      saveProjectBtn.disabled   = false;
-      deleteProjectBtn.disabled = false;
+      projectList.appendChild(li);
     });
+  }
+
+  // ——— Botones y eventos ———
+  document.getElementById("new-project-btn").addEventListener("click", () => {
+    newPrompt.style.display = "block";
+  });
+
+  createProjectBtn.addEventListener("click", async () => {
+    const name = newNameInput.value.trim();
+    if (!name) return showToast("warning", "Ponle un nombre al proyecto");
+    const proj = await createProject(name);
+    currentProjectId = proj.id;
+    currentProjectName = proj.name;
+    newPrompt.style.display = "none";
+    await refreshProjectOptions();
+    showToast("success", `Proyecto “${proj.name}” creado`);
+  });
+
+  cancelCreateBtn.addEventListener("click", () => {
+    newPrompt.style.display = "none";
+  });
+
+  saveProjectBtn.addEventListener("click", async () => {
+    if (!currentProjectId) return showToast("warning", "No hay proyecto activo");
+
+    // Serializa estado actual
+    const proje = {
+      id: currentProjectId,
+      name: currentProjectName,
+      context: contextInput.value,
+      detectedConstraints: Array.from(detectedList.children).map(li => li.textContent),
+      manualConstraints: JSON.parse(sessionStorage.getItem("restricciones") || "[]"),
+      variables: JSON.parse(sessionStorage.getItem("variables") || "{}"),
+      gurobiState: currentGurobiModel
+        ? {
+            vars: currentGurobiModel.getVars().map(v => ({ name: v.varName, lb: v.lb, ub: v.ub, type: v.vType })),
+            cons: currentGurobiModel.getConstrs().map(c => ({ expr: currentGurobiModel.getRow(c).toString(), sense: c.sense, rhs: c.rhs })),
+            objective: currentGurobiModel.getObjective().toString(),
+            sense: currentGurobiModel.get(gp.GRB.IntAttr.ModelSense)
+          }
+        : { vars: [], cons: [], objective: "0", sense: 1 }
+    };
+
+    await updateProject(proje);
+    showToast("success", `Proyecto “${currentProjectName}” guardado`);
+    await refreshProjectOptions();
+  });
+
+  deleteProjectBtn.addEventListener("click", async () => {
+    if (!currentProjectId) return showToast("warning", "No hay proyecto activo");
+    if (!confirm(`¿Borrar el proyecto “${currentProjectName}”?`)) return;
+    await deleteProject(currentProjectId);
+    showToast("warning", `Proyecto eliminado`);
+    currentProjectId = null;
+    await refreshProjectOptions();
+  });
+
+  // ——— Inicializar ———
+  refreshProjectOptions();
 
 
-
-    cancelCreateBtn.addEventListener("click", () => {
-      newPrompt.style.display = "none";
-    });
-
-    saveProjectBtn.addEventListener("click", () => {
-      if (!currentProjectId) {
-        showToast("warning", "No hay proyecto activo");
-        return;
-      }
-
-      // Carga el proyecto anterior para recuperar su gurobiState si no hay modelo vivo
-      const existing = loadProjectData(currentProjectId);
-      let gurobiState;
-
-      if (currentGurobiModel) {
-        // Serializamos el estado actual del modelo
-        gurobiState = {
-          vars: currentGurobiModel.getVars().map(v => ({
-            name: v.varName, lb: v.lb, ub: v.ub, type: v.vType
-          })),
-          cons: currentGurobiModel.getConstrs().map(c => ({
-            expr: currentGurobiModel.getRow(c).toString(),
-            sense: c.sense, rhs: c.rhs
-          })),
-          objective: currentGurobiModel.getObjective().toString(),
-          sense: currentGurobiModel.get(GRB.IntAttr.ModelSense)
-        };
-      } else if (existing && existing.gurobiState) {
-        // Sin modelo nuevo, reutilizamos el anterior
-        gurobiState = existing.gurobiState;
-      } else {
-        // Ni antiguo ni nuevo: creamos un estado vacío
-        gurobiState = { vars: [], cons: [], objective: "0", sense: 1 };
-      }
-
-      // Ahora guardamos TODO el proyecto
-      const proj = {
-        id: currentProjectId,
-        name: currentProjectName,
-        context: contextInput.value,
-        detectedConstraints: Array.from(detectedList.children).map(li => li.textContent),
-        manualConstraints: JSON.parse(sessionStorage.getItem("restricciones") || "[]"),
-        variables: JSON.parse(sessionStorage.getItem("variables") || "{}"),
-        gurobiState
-      };
-
-      saveProjectData(proj);
-      showToast("success", `Proyecto “${proj.name}” guardado`);
-
-      // (Opcional) refrescar la lista para mantener todo sincronizado
-      refreshProjectOptions();
-    });
-
-
-    deleteProjectBtn.addEventListener("click", () => {
-      if (!currentProjectId) return showToast("warning", "No hay proyecto activo");
-      if (!confirm(`¿Borrar el proyecto “${currentProjectName}”?`)) return;
-
-      deleteProject(currentProjectId);
-      refreshProjectOptions();
-
-      currentProjectId = null;
-      currentProjectName = "";
-
-      contextInput.value = "";
-      detectedList.innerHTML = "";
-      document.querySelector(".restricciones-list").innerHTML = "";
-      sessionStorage.clear();
-
-      saveProjectBtn.disabled = true;
-      deleteProjectBtn.disabled = true;
-
-      showToast("warning", `Proyecto eliminado`);
-    });
 
 
     let btnContainer = wrapper.querySelector('.context-btns');
