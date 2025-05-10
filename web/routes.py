@@ -8,8 +8,6 @@ import os
 
 routes = Blueprint('routes', __name__, template_folder='../web/templates')
 
-global_model = None  # Variable global para models que vienen de /api/translate
-
 
 @routes.route('/')
 def index():
@@ -142,15 +140,35 @@ def delete_project(pid):
 
 @routes.route('/api/translate', methods=['POST'])
 def translate():
-    global global_model
     data = request.get_json()
     context = data.get('input_data')
     if not context:
         return jsonify({"error": "No se proporcionaron datos de entrada"}), 400
+
     variables = extract_variables_from_context(context)
     session['variables'] = variables
-    global_model = ShiftOptimizer(variables)
+
+    # Guardar modelo en current_app
+    current_app.shift_store = ShiftOptimizer(variables)
     return jsonify({"result": variables})
+
+
+@routes.route("/api/edit_constraint", methods=["POST"])
+def edit_constraint():
+    data = request.json
+    old_nl = data["old_nl"]
+    new_nl = data["new_nl"]
+
+    if not hasattr(current_app, 'shift_store'):
+        return jsonify(success=False, error="No se ha inicializado el modelo"), 400
+
+    optimizer: ShiftOptimizer = current_app.shift_store
+    ok = optimizer.editar_restriccion(old_nl, new_nl)
+    if ok:
+        return jsonify(success=True)
+    else:
+        return jsonify(success=False, error="Validación fallida"), 400
+
 
 
 @routes.route('/api/convert', methods=['POST'])
@@ -165,21 +183,6 @@ def convert():
               f"{list(current_app.shift_store.restricciones_validadas.keys())}")
     return jsonify({"code": code, "valid": valid})
 
-
-@routes.route("/api/edit_constraint", methods=["POST"])
-def edit_constraint():
-    data = request.json
-    old_nl = data["old_nl"]
-    new_nl = data["new_nl"]
-
-    if not global_model:
-        return jsonify(success=False, error="No se ha inicializado el modelo"), 400
-
-    ok = global_model.editar_restriccion(old_nl, new_nl)
-    if ok:
-        return jsonify(success=True)
-    else:
-        return jsonify(success=False, error="Validación fallida"), 400
 
 
 @routes.route('/api/optimize', methods=['POST'])

@@ -169,6 +169,14 @@ document.addEventListener("DOMContentLoaded", function () {
     currentProjectId = proj.id;
     currentProjectName = proj.name;
     newPrompt.style.display = "none";
+    // Limpiar estado previo
+    contextInput.value = "";
+    detectedList.innerHTML = "";
+    document.querySelector(".restricciones-list").innerHTML = "";
+    detectedPanel.style.display = "none";
+    sessionStorage.setItem("restricciones", JSON.stringify([]));
+    sessionStorage.setItem("variables", JSON.stringify({}));
+
     await refreshProjectOptions();
     showToast("success", `Proyecto “${proj.name}” creado`);
   });
