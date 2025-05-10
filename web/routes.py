@@ -169,7 +169,43 @@ def edit_constraint():
     else:
         return jsonify(success=False, error="Validación fallida"), 400
 
+@routes.route("/api/delete_constraint", methods=["POST"])
+def delete_constraint():
+    data = request.json
+    nl = data.get("nl")
 
+    if not nl:
+        return jsonify(success=False, error="No se especificó la restricción."), 400
+
+    if not hasattr(current_app, 'shift_store'):
+        return jsonify(success=False, error="No se ha inicializado el modelo"), 400
+
+    optimizer: ShiftOptimizer = current_app.shift_store
+    if nl in optimizer.restricciones_validadas:
+        del optimizer.restricciones_validadas[nl]
+        return jsonify(success=True)
+    else:
+        return jsonify(success=False, error="Restricción no encontrada."), 404
+
+@routes.route("/api/view_constraint", methods=["POST"])
+def view_constraint():
+    """Devuelve el código Gurobi de una restricción validada a partir de su texto."""
+    data = request.get_json()
+    nl = data.get("nl")
+
+    if not nl:
+        return jsonify(success=False, error="No se especificó la restricción."), 400
+
+    if not hasattr(current_app, 'shift_store'):
+        return jsonify(success=False, error="No se ha inicializado el modelo"), 400
+
+    optimizer: ShiftOptimizer = current_app.shift_store
+    restr = optimizer.restricciones_validadas.get(nl)
+
+    if restr:
+        return jsonify(success=True, code=restr["code"])
+    else:
+        return jsonify(success=False, error="Restricción no encontrada."), 404
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():

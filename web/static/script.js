@@ -24,8 +24,9 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Referencias a los elementos de la UI
-  const saveProjectBtn = document.getElementById("save-project");
   const deleteProjectBtn = document.getElementById("delete-project");
+  // Oculta el botón global
+  if (deleteProjectBtn) deleteProjectBtn.style.display = "none";
   const newPrompt = document.getElementById("new-project-prompt");
   const newNameInput = document.getElementById("new-project-name");
   const createProjectBtn = document.getElementById("create-project");
@@ -121,7 +122,28 @@ document.addEventListener("DOMContentLoaded", function () {
       const li = document.createElement("li");
       li.textContent = p.name;
       li.dataset.id = p.id;
+
+      // Crear el botón de borrar con un icono
+      const deleteBtn = document.createElement("button");
+      deleteBtn.classList.add("delete-btn");
+      deleteBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`; // Icono de papelera
+      deleteBtn.addEventListener("click", async (e) => {
+        e.stopPropagation(); // Evita que el clic se propague al li
+        if (!confirm(`¿Borrar el proyecto “${p.name}”?`)) return;
+        await deleteProject(p.id);
+        showToast("warning", `Proyecto “${p.name}” eliminado`);
+        await refreshProjectOptions(); // Refrescar la lista después de borrar
+      });
+
+      // Añadir el botón de borrar al li
+      li.appendChild(deleteBtn);
+
       li.addEventListener("click", async () => {
+        if (currentProjectId) await autoSaveProject();
+
+        document.querySelectorAll("#project-list li").forEach(el => el.classList.remove("active"));
+        li.classList.add("active");
+
         const proj = await loadProject(p.id);
         if (proj.error) return showToast("error", "Error cargando proyecto");
 
@@ -144,7 +166,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
 
-        saveProjectBtn.disabled = false;
         deleteProjectBtn.disabled = false;
         showToast("info", `Proyecto “${proj.name}” cargado`);
         sidebar.classList.remove("open");
@@ -153,9 +174,44 @@ document.addEventListener("DOMContentLoaded", function () {
         window.currentGurobiModel = currentGurobiModel;
         showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
       });
+
       projectList.appendChild(li);
     });
   }
+
+  async function autoSaveProject() {
+    if (!currentProjectId) return;
+
+    const proje = {
+      id: currentProjectId,
+      name: currentProjectName,
+      context: contextInput.value,
+      detectedConstraints: Array.from(detectedList.children).map(li => li.textContent),
+      manualConstraints: JSON.parse(sessionStorage.getItem("restricciones") || "[]"),
+      variables: JSON.parse(sessionStorage.getItem("variables") || "{}"),
+      gurobiState: currentGurobiModel
+        ? {
+            vars: currentGurobiModel.getVars().map(v => ({
+              name: v.varName,
+              lb: v.lb,
+              ub: v.ub,
+              type: v.vType
+            })),
+            cons: currentGurobiModel.getConstrs().map(c => ({
+              expr: currentGurobiModel.getRow(c).toString(),
+              sense: c.sense,
+              rhs: c.rhs
+            })),
+            objective: currentGurobiModel.getObjective().toString(),
+            sense: currentGurobiModel.get(gp.GRB.IntAttr.ModelSense)
+          }
+        : { vars: [], cons: [], objective: "0", sense: 1 }
+    };
+
+    await updateProject(proje);
+    console.log(`Guardado automático del proyecto “${currentProjectName}”`);
+  }
+
 
   // ——— Botones y eventos ———
   document.getElementById("new-project-btn").addEventListener("click", () => {
@@ -185,31 +241,6 @@ document.addEventListener("DOMContentLoaded", function () {
     newPrompt.style.display = "none";
   });
 
-  saveProjectBtn.addEventListener("click", async () => {
-    if (!currentProjectId) return showToast("warning", "No hay proyecto activo");
-
-    // Serializa estado actual
-    const proje = {
-      id: currentProjectId,
-      name: currentProjectName,
-      context: contextInput.value,
-      detectedConstraints: Array.from(detectedList.children).map(li => li.textContent),
-      manualConstraints: JSON.parse(sessionStorage.getItem("restricciones") || "[]"),
-      variables: JSON.parse(sessionStorage.getItem("variables") || "{}"),
-      gurobiState: currentGurobiModel
-        ? {
-            vars: currentGurobiModel.getVars().map(v => ({ name: v.varName, lb: v.lb, ub: v.ub, type: v.vType })),
-            cons: currentGurobiModel.getConstrs().map(c => ({ expr: currentGurobiModel.getRow(c).toString(), sense: c.sense, rhs: c.rhs })),
-            objective: currentGurobiModel.getObjective().toString(),
-            sense: currentGurobiModel.get(gp.GRB.IntAttr.ModelSense)
-          }
-        : { vars: [], cons: [], objective: "0", sense: 1 }
-    };
-
-    await updateProject(proje);
-    showToast("success", `Proyecto “${currentProjectName}” guardado`);
-    await refreshProjectOptions();
-  });
 
   deleteProjectBtn.addEventListener("click", async () => {
     if (!currentProjectId) return showToast("warning", "No hay proyecto activo");
@@ -443,7 +474,23 @@ document.addEventListener("DOMContentLoaded", function () {
       editButton.classList.add("edit-btn");
       editButton.title = "Editar"
 
+      // Botón 🗑️ (Eliminar)
+      const deleteButton = document.createElement("button");
+      deleteButton.textContent = "🗑️";
+      deleteButton.classList.add("delete-button");
+      deleteButton.title = "Eliminar";
+
+      // Botón </> (Mostrar código)
+      const viewButton = document.createElement("button");
+      viewButton.textContent = "</>";
+      viewButton.classList.add("view-button");
+      viewButton.title = "Ver código generado";
+
+
+
       controlsWrapper.appendChild(editButton);
+      controlsWrapper.appendChild(deleteButton);
+      controlsWrapper.appendChild(viewButton);
       li.appendChild(controlsWrapper);
 
       editButton.addEventListener("click", () => {
@@ -546,9 +593,104 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         });
       });
+
+      // Acción eliminar
+      deleteButton.addEventListener("click", async () => {
+        const confirmDelete = confirm("¿Estás seguro de que quieres eliminar esta restricción?");
+        if (!confirmDelete) return;
+
+        try {
+          const res = await fetch("/api/delete_constraint", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nl: label.textContent })
+          });
+          const result = await res.json();
+
+          if (res.ok && result.success) {
+            li.remove();
+            guardarRestricciones();
+            showToast("success", "Restricción eliminada correctamente.");
+          } else {
+            throw new Error(result.error || "Error del servidor");
+          }
+        } catch (e) {
+          showToast("error", "Error al eliminar restricción.");
+          console.error(e);
+        }
+      });
+
+      viewButton.addEventListener("click", async (e) => {
+        const constraintText = label.textContent;
+
+        try {
+          const res = await fetch("/api/view_constraint", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nl: constraintText })
+          });
+
+          const result = await res.json();
+
+          if (res.ok && result.code) {
+            // Quitar popups anteriores
+            document.querySelectorAll(".code-popup").forEach(p => p.remove());
+
+            const popup = document.createElement("div");
+            popup.classList.add("code-popup");
+            popup.innerHTML = `
+              <button class="close-popup">&times;</button>
+              <pre>${result.code}</pre>
+            `;
+            document.body.appendChild(popup);
+
+            // Dimensiones
+            const buttonRect = e.target.getBoundingClientRect();
+            const popupWidth = popup.offsetWidth;
+            const spacing = 8;
+
+            // Encontrar contenedor panel
+            const panel = e.target.closest(".panel");
+            const panelRect = panel.getBoundingClientRect();
+
+            // Coordenadas base
+            let left = buttonRect.left + window.scrollX - popupWidth - spacing;
+            let top = buttonRect.top + window.scrollY;
+
+            // Evitar que se salga del panel por la izquierda
+            const minLeft = panelRect.left + window.scrollX + 10;
+            if (left < minLeft) left = minLeft;
+
+            popup.style.position = "absolute";
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+
+            // Botón cerrar
+            popup.querySelector(".close-popup").addEventListener("click", () => {
+              popup.remove();
+            });
+
+            // Cerrar si se hace clic fuera
+            const closeOnOutsideClick = (evt) => {
+              if (!popup.contains(evt.target) && evt.target !== viewButton) {
+                popup.remove();
+                document.removeEventListener("click", closeOnOutsideClick);
+              }
+            };
+            setTimeout(() => document.addEventListener("click", closeOnOutsideClick), 0);
+          } else {
+            throw new Error(result.error || "Error al obtener código");
+          }
+        } catch (e) {
+          showToast("error", "No se pudo mostrar el código.");
+          console.error(e);
+        }
+      });
+
+
+
+
     }
-
-
 
     async function intentarConvertir(constraint, intentos = 3) {
         try {
@@ -681,33 +823,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // cargar al inicio
     cargarRestricciones();
 
-    const resultadoModal = document.getElementById("resultado-modal");
-    const resultadoContenido = document.getElementById("resultado-contenido");
-    const closeResultadoBtn = resultadoModal?.querySelector(".close-btn");
-    const downloadExcelBtn = document.getElementById("download-excel-btn");
-
-    function showResultadoModal() {
-        resultadoModal.style.display = "flex";
-    }
-
-    function closeResultadoModal() {
-        resultadoModal.style.display = "none";
-    }
-
-    if (closeResultadoBtn) {
-        closeResultadoBtn.addEventListener("click", closeResultadoModal);
-    }
-
-    window.addEventListener("click", (event) => {
-        if (event.target === resultadoModal) closeResultadoModal();
-    });
-
-    if (downloadExcelBtn) {
-        downloadExcelBtn.addEventListener("click", () => {
-            window.location.href = "/api/download_excel";
-        });
-    }
-
 
     const optimizeButton = document.getElementById('optimize-button');
     if (optimizeButton) {
@@ -754,7 +869,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
+    window.addEventListener("beforeunload", async (e) => {
+      if (currentProjectId) await autoSaveProject();
+    });
     if (contextInput) contextInput.focus();
-    const constraintInput = document.getElementById('constraint');
-    if (constraintInput) constraintInput.focus();
+
 });

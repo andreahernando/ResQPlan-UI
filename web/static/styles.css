@@ -202,22 +202,27 @@ body {
 .restriccion .btn,
 .restriccion-item .edit-btn,
 .restriccion-item .save-btn,
-.restriccion-item .cancel-btn {
-  background: none !important;    /* quita el color de fondo */
-  color: inherit !important;      /* hereda el color de texto del contenedor */
-  box-shadow: none !important;    /* quita la sombra */
-  padding: 4px !important;        /* ajusta el padding a tu gusto */
-  margin: 0 4px !important;       /* separa un poquito los iconos */
+.restriccion-item .cancel-btn,
+.restriccion-item .delete-button,
+.restriccion-item .view-button {
+  background: none !important;
+  color: inherit !important;
+  box-shadow: none !important;
+  padding: 4px !important;
+  margin: 0 4px !important;
 }
 
 /* 2) Hover suave para indicar clicable sin usar azul fuerte */
 .restriccion .btn:hover,
 .restriccion-item .edit-btn:hover,
 .restriccion-item .save-btn:hover,
-.restriccion-item .cancel-btn:hover {
-  background: rgba(0,0,0,0.05) !important;
+.restriccion-item .cancel-btn:hover,
+.restriccion-item .delete-button:hover,
+.restriccion-item .view-button:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
   border-radius: 4px;
 }
+
 
 
 /* Contenedor de botones alineado a la derecha */
@@ -624,13 +629,14 @@ body {
   position: fixed;
   top: 0; left: 0;
   width: 250px; height: 100%;
-  background: #fff;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  background: #ffffff; /* Fondo blanco, al igual que el de otros paneles */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra sutil */
   transform: translateX(-100%);
   transition: transform 0.25s ease-in-out;
   z-index: 1000;
   display: flex;
   flex-direction: column;
+  border-radius: 10px; /* Bordes redondeados */
 }
 
 /* Cuando está abierto */
@@ -644,17 +650,23 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  border-bottom: 1px solid #eee;
+  background-color: #f4f4f4; /* Gris claro para que combine con el resto */
+  border-bottom: 1px solid #eee; /* Borde suave para separarlo del contenido */
+  color: #333; /* Color de texto más oscuro para mejor contraste */
 }
+
 
 /* Contenido principal */
 .sidebar-content {
   flex: 1;
   padding: 1rem;
   overflow-y: auto;
+  background-color: #f8fbff; /* Fondo claro similar al de los paneles */
+  border-bottom-left-radius: 10px; /* Bordes redondeados en la parte inferior */
+  border-bottom-right-radius: 10px;
 }
 
-/* Prompt de nuevo proyecto, oculto por defecto */
+/* Prompt de nuevo proyecto */
 .new-prompt {
   display: none;
   margin-top: 0.5rem;
@@ -669,9 +681,18 @@ body {
 .project-list li {
   padding: 0.5rem;
   cursor: pointer;
+  border-radius: 8px; /* Bordes redondeados en cada proyecto */
+  transition: background-color 0.3s ease;
 }
+
 .project-list li:hover {
-  background: #f0f0f0;
+  background-color: #f0f0f0; /* Fondo suave en hover */
+}
+
+#project-list li.active {
+  background-color: #dcdcdc; /* Gris claro pero más visible */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Sombreado suave */
+  border-radius: 4px; /* Bordes redondeados opcionales */
 }
 
 /* Footer con botones */
@@ -680,6 +701,8 @@ body {
   border-top: 1px solid #eee;
   display: flex;
   gap: 0.5rem;
+  background-color: #ffffff; /* Fondo blanco */
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08); /* Sombra sutil */
 }
 
 /* Botón hamburguesa a la izquierda */
@@ -694,29 +717,104 @@ body {
   cursor: pointer;
   padding: 0.5rem;
 }
-
 /* Botón cerrar dentro del sidebar */
 .close-btn {
   background: none;
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
+  color: #007bff; /* Azul similar al de la interfaz */
 }
-
 /* Botón “Nuevo proyecto” */
 .new-project-btn {
   display: block;
   width: 100%;
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
-  background: #007bff;
+  background: #007bff; /* Mismo azul */
   color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px; /* Bordes redondeados */
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
+  font-weight: bold;
+  transition: all 0.3s ease;
 }
 .new-project-btn:hover {
   background: #0056b3;
+  transform: scale(1.05);
 }
 
+
+.delete-btn {
+  background-color: transparent;
+  border: none;
+  color: #666; /* Gris oscuro para el icono */
+  cursor: pointer;
+  font-size: 16px; /* Tamaño del icono */
+  margin-left: 10px;
+  transition: color 0.3s ease;
+  position: absolute; /* Alineación absoluta dentro del li */
+  right: 10px; /* Alineado a la derecha */
+  top: 50%;
+  transform: translateY(-50%); /* Centra verticalmente */
+}
+
+.delete-btn:hover {
+  color: #333; /* Gris más oscuro al pasar el ratón */
+}
+
+.delete-btn i {
+  pointer-events: none; /* Evita que el icono tenga interacciones propias */
+}
+
+li {
+  position: relative; /* Necesario para que el botón se posicione correctamente */
+  padding-right: 30px; /* Espacio para el botón de borrar */
+}
+
+.code-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  transform: translateY(10px);
+  background: white;
+  color: #212529;
+  padding: 1.2rem 1.5rem;
+  border-radius: 12px;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  font-family: monospace;
+  border: 1px solid #aacbe2;
+  max-width: 500px;
+  min-width: 300px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.code-popup pre {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: #eaf3ff;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #c3dffc;
+}
+
+.close-popup {
+  background: none;
+  border: none;
+  color: #007bff;
+  font-size: 1.2em;
+  font-weight: bold;
+  float: right;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.close-popup:hover {
+  color: #0056b3;
+}
