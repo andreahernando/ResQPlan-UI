@@ -332,13 +332,30 @@ document.addEventListener("DOMContentLoaded", function () {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ input_data: ctx }),
         })
-        .then(res =>
-          res.json()
-             .then(p => ({ status: res.status, ok: res.ok, p }))
-        )
-        .then(({ ok, status, p }) => {
+        .then(async res => {
           if (loadingOverlay) loadingOverlay.style.display = "none";
-          if (!ok) throw new Error(p.error || `HTTP ${status}`);
+
+          let data;
+          try {
+            data = await res.json();
+          } catch (_) {
+            throw new Error(`Error al parsear JSON de respuesta`);
+          }
+
+          // si hubo error HTTP, extraemos el mensaje y abortamos
+          if (!res.ok) {
+            // tu backend devuelve { message: "…"} o { error: "…"}
+            const errMsg = data.message ?? data.error ?? `Error HTTP ${res.status}`;
+            throw new Error(errMsg);
+          }
+
+          // éxito: devolvemos el JSON completo
+          return data;
+        })
+
+        .then(p => {
+
+          if (loadingOverlay) loadingOverlay.style.display = "none";
 
           // 1) Guardar variables
           sessionStorage.setItem("variables", JSON.stringify(p.result));
@@ -368,7 +385,6 @@ document.addEventListener("DOMContentLoaded", function () {
             contextWarning.style.visibility = 'hidden';
           }
 
-          // 3) Guardamos el original y delegamos todo en renderContextControls()
           originalText = ctx;
           contextInput.setAttribute('contenteditable', 'false');
 
@@ -642,61 +658,85 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
 
-
-
-
     }
 
     async function intentarConvertir(constraint, intentos = 3) {
-        try {
-            const res = await fetch("/api/convert", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ constraint }),
-            });
-            if (!res.ok) throw new Error("Respuesta no ok");
-            await res.json(); // no usamos el resultado visual aquí
+      try {
+        const res = await fetch("/api/convert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ constraint }),
+        });
 
-            const lista = document.querySelector(".restricciones-list");
-            if (!lista) return;
+        // 1) Parseamos siempre el JSON de respuesta
+        const data = await res.json().catch(() => {
+          throw new Error("Respuesta no válida del servidor");
+        });
 
-            // evitar duplicados
-            if (
-                Array.from(lista.children).some(
-                    (li) => li.querySelector("label")?.innerText === constraint
-                )
-            ) return;
-
-            const li = document.createElement("li");
-            li.classList.add("restriccion-item");
-
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.checked = true;
-            checkbox.classList.add("chk-rest");
-            checkbox.addEventListener("change", guardarRestricciones);
-
-            const label = document.createElement("label");
-            label.textContent = constraint;
-            label.style.marginLeft = "8px";
-
-
-            li.append(checkbox, label);
-            attachInlineEditor(li, label, guardarRestricciones, showToast);
-            lista.appendChild(li);
-            guardarRestricciones();
-            showToast("success", "Restricción añadida correctamente.");
-        } catch (err) {
-            if (intentos > 1) {
-                await new Promise((r) => setTimeout(r, 1000));
-                return intentarConvertir(constraint, intentos - 1);
-            } else {
-                showToast("error", "No se pudo añadir la restricción.");
-                const resDiv = document.getElementById("constraint-result");
-                if (resDiv) resDiv.innerText = "Error al contactar con la API.";
-            }
+        // 2) Si la respuesta NO es 2xx, lanzamos con el mensaje de error
+        if (!res.ok) {
+          const msg = data.message ?? `Error HTTP ${res.status}`;
+          throw new Error(msg);
         }
+
+        // 3) Si la restricción no es válida según el backend, lo notificamos y salimos
+        if (data.valid === false) {
+          const msg = data.message ?? "La restricción no aplica al contexto proporcionado.";
+          showToast("error", msg);
+          const resDiv = document.getElementById("constraint-result");
+          if (resDiv) resDiv.innerText = msg;
+          return;
+        }
+
+        // 4) ¡La restricción es válida! → añadimos a la lista
+        const lista = document.querySelector(".restricciones-list");
+        if (!lista) return;
+
+        // Evitar duplicados
+        if (
+          Array.from(lista.children).some(
+            li => li.querySelector("label")?.innerText === constraint
+          )
+        ) {
+          return;
+        }
+
+        const li = document.createElement("li");
+        li.classList.add("restriccion-item");
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = true;
+        checkbox.classList.add("chk-rest");
+        checkbox.addEventListener("change", guardarRestricciones);
+
+        const label = document.createElement("label");
+        label.textContent = constraint;
+        label.style.marginLeft = "8px";
+
+        li.append(checkbox, label);
+        attachInlineEditor(li, label, guardarRestricciones, showToast);
+        lista.appendChild(li);
+
+        guardarRestricciones();
+        showToast("success", "Restricción añadida correctamente.");
+
+      } catch (err) {
+        const msg = err.message ?? String(err);
+
+        // Errores de fetch o status ≠ 2xx
+        showToast("error", msg);
+        const resDiv = document.getElementById("constraint-result");
+        if (resDiv) resDiv.innerText = msg;
+
+        // Reintentos automáticos si es un error distinto de “no aplica”
+        if (intentos > 1 && !["La restricción no aplica al contexto proporcionado."].includes(msg)) {
+          await new Promise(r => setTimeout(r, 1000));
+          return intentarConvertir(constraint, intentos - 1);
+        }
+      }
     }
+
 
     const convertButton = document.getElementById("convert-button");
     if (convertButton) {
@@ -746,7 +786,6 @@ document.addEventListener("DOMContentLoaded", function () {
         convertButton.disabled   = false;
         progressContainer.style.display = "none";
 
-        showToast("success", "Todas las restricciones se han añadido.");
       });
     }
 

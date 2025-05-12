@@ -60,41 +60,41 @@ def extract_variables_from_context(context: str) -> dict:
         "   que contenga todas las oraciones del texto de entrada que parezcan "
         "   restricciones en lenguaje natural.\n\n"
         "Si no se detecta ninguna restricción válida, devuelve 'detected_constraints': []` o no incluyas esa clave."
+        "⚠️ IMPORTANTE: Si el texto no describe un problema de turnos, responde únicamente con:\n"
+        "{ \"error\": \"El texto no describe un problema de turnos válido.\" }\n\n"
         "Devuelve **solo** ese JSON, sin comentarios ni Markdown.\n\n"
         f"=== TEXTO DE ENTRADA ===\n{context}\n======================="
     )
 
-    for attempt in range(config.MAX_ATTEMPTS):
-        try:
-            resp = client.chat.completions.create(
-                model="o3-mini",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            content = resp.choices[0].message.content.strip()
-            data = json.loads(content)
+    try:
+        resp = client.chat.completions.create(
+            model="o3-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        content = resp.choices[0].message.content.strip()
+        data = json.loads(content)
 
-            # Inicializar lista de restricciones detectadas si no viene
-            if 'detected_constraints' not in data:
-                data['detected_constraints'] = []
+        if "error" in data:
+            return {"error": data["error"]}
 
-            # Validaciones básicas
-            if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):
-                raise ValueError("El JSON de salida no tiene las claves requeridas.")
+        # Inicializar lista de restricciones detectadas si no viene
+        if 'detected_constraints' not in data:
+            data['detected_constraints'] = []
 
-            vars_dict = data['variables']
-            for key in ('dias', 'franjas', 'horarios'):
-                if key not in vars_dict:
-                    raise ValueError(f"Falta la variable obligatoria '{key}' en 'variables'.")
+        # Validaciones básicas
+        if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):
+            return {"error": "El JSON de salida no tiene las claves requeridas."}
+        vars_dict = data['variables']
+        for key in ('dias', 'franjas', 'horarios'):
+            if key not in vars_dict:
+                return {"error": f"Falta la variable obligatoria '{key}' en 'variables'."}
 
-            return data
+        return data
 
-        except json.JSONDecodeError as e:
-            print(f"❌ JSON inválido intento {attempt+1}: {e}")
-        except Exception as e:
-            print(f"⚠️ Error en intento {attempt+1}: {e}")
-            time.sleep(1)
-
-    raise RuntimeError("❌ No se pudo extraer variables y recursos tras múltiples intentos.")
+    except json.JSONDecodeError as e:
+        return {"error": f"El JSON devuelto no es válido: {e}"}
+    except Exception as e:
+        return {"error": f"Error durante la extracción de datos: {e}"}
 
 
 
@@ -132,18 +132,30 @@ def translate_constraint_to_code(nl_constraint: str, specs: dict) -> str:
         "- Nombra cada restricción con name=''.\n"
         "- Accede a las variables a través de 'specs[\"variables\"]', por ejemplo: specs['variables']['dias'], y usa los nombres adecuados como 'x_retenes' o 'x_conductores'.\n"
         "- Refierete a las variables de decisión usando los nombres separados por tipo, como 'x_retenes[(r, d, f)]', 'x_conductores[(r, d, f)]', etc., según el tipo de recurso correspondiente.\n"
+        "\n\n⚠️ IMPORTANTE: Si la restricción en lenguaje natural no se corresponde con ninguna variable o recurso "
+       "del problema, responde SÓLO con:\n"
+       '{ "error": "La restricción no aplica al contexto proporcionado." }\n'
+       "Sin explicaciones ni Markdown, sólo ese JSON."
         "Devuelve SOLO el código, sin explicaciones ni Markdown."
     )
     for attempt in range(config.MAX_ATTEMPTS):
         try:
             resp = client.chat.completions.create(
                 model="o3-mini",
-                messages=[{"role":"user","content":prompt}]
+                messages=[{"role": "user", "content": prompt}]
             )
-            code = resp.choices[0].message.content.strip()
-            compile(code, '<string>', 'exec')
-            return code
+            content = resp.choices[0].message.content.strip()
+
+            # Si es JSON de error, lo devolvemos como dict
+            if content.startswith('{') and '"error"' in content:
+                return json.loads(content)
+
+            # Si no, asumimos que es código
+            compile(content, '<string>', 'exec')  # valida el código
+            return content
+
         except Exception as e:
-            print(f"⚠️ Error traducción intento {attempt+1}: {e}")
+            print(f"⚠️ Error traducción intento {attempt + 1}: {e}")
             time.sleep(1)
+
     raise RuntimeError("❌ No se pudo traducir la restricción tras múltiples intentos.")

@@ -140,17 +140,27 @@ def delete_project(pid):
 
 @routes.route('/api/translate', methods=['POST'])
 def translate():
-    data = request.get_json()
-    context = data.get('input_data')
+    data = request.get_json() or {}
+    context = data.get('input_data', '').strip()
     if not context:
-        return jsonify({"error": "No se proporcionaron datos de entrada"}), 400
+        return jsonify({"message": "No se proporcionaron datos de entrada"}), 400
 
-    variables = extract_variables_from_context(context)
+    try:
+        variables = extract_variables_from_context(context)
+        # Si tu función devuelve {"error": "..."} lo tratamos también como fallo
+        if isinstance(variables, dict) and variables.get("error"):
+            return jsonify({"message": variables["error"]}), 400
+
+    except Exception as e:
+        # Aquí cogemos TANTO tu RuntimeError de múltiples intentos
+        # como cualquier otro ValueError o JSONDecodeError
+        return jsonify({"message": str(e)}), 400
+
+    # Si todo fue bien…
     session['variables'] = variables
-
-    # Guardar modelo en current_app
     current_app.shift_store = ShiftOptimizer(variables)
-    return jsonify({"result": variables})
+    return jsonify({"result": variables}), 200
+
 
 
 @routes.route("/api/edit_constraint", methods=["POST"])
@@ -209,15 +219,42 @@ def view_constraint():
 
 @routes.route('/api/convert', methods=['POST'])
 def convert():
-    data = request.get_json()
-    nl = data.get('constraint')
-    code = translate_constraint_to_code(nl, session['variables']['variables'])
-    valid = False
-    if hasattr(current_app, 'shift_store'):
-        valid = current_app.shift_store.validar_restriccion(nl, code)
-        print(f"[DEBUG CONVERT] Now restricciones_validadas keys: "
-              f"{list(current_app.shift_store.restricciones_validadas.keys())}")
-    return jsonify({"code": code, "valid": valid})
+    data = request.get_json() or {}
+    nl = (data.get('constraint') or "").strip()
+
+    # 1) Validación de entrada
+    if not nl:
+        return jsonify({"message": "No se especificó ninguna restricción."}), 400
+
+    try:
+        # 2) Traducción: puede devolver código o {"error": "..."}
+        result = translate_constraint_to_code(nl, session['variables']['variables'])
+
+        # 3) Si el resultado es un dict con error, lo tratamos como fallo de usuario
+        if isinstance(result, dict) and result.get("error"):
+            # devolvemos 400 con ese mensaje
+            return jsonify({"message": result["error"]}), 400
+
+        code = result
+
+        # 4) Validación Gurobi
+        valid = False
+        if hasattr(current_app, 'shift_store'):
+            valid = current_app.shift_store.validar_restriccion(nl, code)
+            print(f"[DEBUG CONVERT] Now restricciones_validadas keys: "
+                  f"{list(current_app.shift_store.restricciones_validadas.keys())}")
+
+        # 5) Respuesta exitosa
+        return jsonify({"code": code, "valid": valid}), 200
+
+    except ValueError as e:
+        # Errores de traducción que lanzan explícitamente ValueError
+        return jsonify({"message": str(e)}), 400
+
+    except Exception as e:
+        # Cualquier otro fallo interno
+        current_app.logger.exception("Error interno en /api/convert")
+        return jsonify({"message": f"Error interno: {e}"}), 500
 
 
 
