@@ -1005,3 +1005,15 @@ document.addEventListener("DOMContentLoaded", function () {
     if (contextInput) contextInput.focus();
 
 });
+// Al volver con history.back(), 'pageshow' siempre se dispara (incluso con cache bfcache)
+window.addEventListener('pageshow', () => {
+  const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
+  document.querySelectorAll('.restriccion-item').forEach(li => {
+    const texto = li.querySelector('label')?.innerText;
+    if (texto && relaxed.includes(texto)) {
+      li.classList.add('relaxed-highlight');
+    } else {
+      li.classList.remove('relaxed-highlight');
+    }
+  });
+});

@@ -118,10 +118,10 @@ if (!raw) {
   });
   renderTabla('Todos');
 
-  // 7) Botón “Volver”
-  document.getElementById('back-btn').addEventListener('click', () => {
-    window.history.back();
-  });
+ document.getElementById('back-btn').addEventListener('click', () => {
+  window.location.href = '/';
+});
+
 
   // 8) Botón “Descargar Excel”
   document.getElementById('download-excel-btn').addEventListener('click', () => {

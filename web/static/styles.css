@@ -868,4 +868,14 @@ li {
   color: #0056b3;
 }
 
+.restriccion-item.relaxed-highlight {
+background-color: #fff3cd;      /\* amarillo muy suave \*/
+border-left:    4px solid #ffc107;
+transition:     background 0.3s;
+}
+
+.restriccion-item.relaxed-highlight\:hover {
+background-color: #ffe8a1;
+}
+
 
