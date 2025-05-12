@@ -55,13 +55,27 @@
   <!-- Panel de contexto -->
   <div class="context-panel">
     <h2>Describe el contexto en lenguaje natural</h2>
+
     <div class="textarea-with-button">
-      <textarea id="context" placeholder="Ejemplo: …"></textarea>
-      <div class="context-btns">
-        <button type="button" id="ok-button">
-          <i class="fas fa-arrow-up"></i> Subir
-        </button>
+      <div id="context"
+           contenteditable="true"
+           class="context-editor"
+           data-placeholder="Ejemplo: …">
+        <br>
       </div>
+
+      <div class="context-footer">
+        <div class="context-warning" id="context-warning">
+          ⚠️ Parece que has incluido restricciones. Puedes moverlas abajo para mayor claridad.
+        </div>
+
+        <div class="context-btns">
+          <button type="button" id="ok-button">
+            <i class="fas fa-arrow-up"></i> Subir
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 

@@ -33,9 +33,14 @@ document.addEventListener("DOMContentLoaded", function () {
   const cancelCreateBtn = document.getElementById("cancel-create");
   const projectList = document.getElementById("project-list");
 
+  const contextWarning = document.getElementById('context-warning');
+
+
   let currentProjectId = null;
   let currentProjectName = "";
   let currentGurobiModel = null;
+
+  renderContextControls();
 
   // — Función auxiliar para parsear expresiones lineales —
   function parseLinExpr(exprStr, varsMap) {
@@ -150,7 +155,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // ——— Recarga de la UI —————————————————————————————————————
         currentProjectId = proj.id;
         currentProjectName = proj.name;
-        contextInput.value = proj.context || "";
+        contextInput.innerText = proj.context || "";
+        renderContextControls();
+
 
         detectedList.innerHTML = "";
         (proj.detectedConstraints || []).forEach(nl => {
@@ -185,7 +192,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const proje = {
       id: currentProjectId,
       name: currentProjectName,
-      context: contextInput.value,
+      context: contextInput.innerText,
       detectedConstraints: Array.from(detectedList.children).map(li => li.textContent),
       manualConstraints: JSON.parse(sessionStorage.getItem("restricciones") || "[]"),
       variables: JSON.parse(sessionStorage.getItem("variables") || "{}"),
@@ -226,7 +233,8 @@ document.addEventListener("DOMContentLoaded", function () {
     currentProjectName = proj.name;
     newPrompt.style.display = "none";
     // Limpiar estado previo
-    contextInput.value = "";
+    contextInput.innerText = "";
+    renderContextControls();
     detectedList.innerHTML = "";
     document.querySelector(".restricciones-list").innerHTML = "";
     detectedPanel.style.display = "none";
@@ -300,7 +308,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function continuar() {
-        const ctx = contextInput.value.trim();
+        const ctx = contextInput.innerText.trim();
         if (!ctx) {
           showToast("warning", "Por favor ingresa algún contexto.");
           return;
@@ -335,112 +343,59 @@ document.addEventListener("DOMContentLoaded", function () {
           // 1) Guardar variables
           sessionStorage.setItem("variables", JSON.stringify(p.result));
 
-          // 2) Mostrar restricciones detectadas (nuevo)
+
+          // Resaltar restricciones detectadas inline en el contexto
           if (p.result.detected_constraints && p.result.detected_constraints.length) {
+            contextWarning.style.visibility = 'visible';
+
+            // 1) Coger el texto plano original
+            let html = contextInput.innerText;
+
+            // 2) Para cada NL detectada, escapamos y envolvemos en <mark>
             p.result.detected_constraints.forEach(nl => {
-              const li = document.createElement('li');
-              li.textContent = nl;
-              detectedList.appendChild(li);
+              const esc = nl.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+              const regex = new RegExp(`(${esc})`, 'g');
+              html = html.replace(regex, `<mark class="highlight">$1</mark>`);
             });
-            detectedPanel.style.display = 'block';
+
+            // 3) Inyectar el HTML con los <mark> dentro del div editable
+            contextInput.innerHTML = html;
+
+            // 4) Ocultamos el panel de lista porque ya no lo usamos
+            detectedPanel.style.display = 'none';
+          } else {
+            // Ocultar el warning si no hay restricciones
+            contextWarning.style.visibility = 'hidden';
           }
 
-          // 3) Desactivar textarea
-          contextInput.disabled = true;
+          // 3) Guardamos el original y delegamos todo en renderContextControls()
           originalText = ctx;
+          contextInput.setAttribute('contenteditable', 'false');
 
-          // 4) Crear botones Editar / Resumen
-          const btnEdit    = document.createElement("button");
-          btnEdit.type     = "button";
-          btnEdit.id       = "edit-context";
-          btnEdit.textContent = "✏️ Editar";
-          const btnSummary = document.createElement("button");
-          btnSummary.type  = "button";
-          btnSummary.id    = "summary-context";
-          btnSummary.textContent = "📄 Ver resumen";
-          btnContainer.append(btnEdit, btnSummary);
-
-          // 5) Mostrar panel de restricciones manuales
+          // 4) Mostramos el panel de restricciones manuales
           const restrSection = document.querySelector(".container");
           if (restrSection) restrSection.style.display = "flex";
+
           showToast("success", "Contexto procesado correctamente.");
 
-          // ✏️ Editar
-          btnEdit.addEventListener("click", () => {
-            btnEdit.remove();
-            btnSummary.remove();
-            contextInput.disabled = false;
-            contextInput.focus();
-            const btnSave = document.createElement("button");
-            btnSave.type = "button";
-            btnSave.id = "ok-button";
-            btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
-            const btnCancel = document.createElement("button");
-            btnCancel.type = "button";
-            btnCancel.id = "cancel-edit";
-            btnCancel.textContent = "✖️ Cancelar";
-            btnContainer.append(btnSave, btnCancel);
-            btnCancel.addEventListener("click", () => {
-              contextInput.value    = originalText;
-              contextInput.disabled = true;
-              btnSave.remove(); btnCancel.remove();
-              btnContainer.append(btnEdit, btnSummary);
-            });
-            btnSave.addEventListener("click", () => {
-              sessionStorage.removeItem("variables");
-              sessionStorage.removeItem("restricciones");
-              document.querySelectorAll(".restricciones-list .restriccion-item")
-                      .forEach(li => li.remove());
-              guardarRestricciones();
-              continuar();
-            });
-          });
+          // 6) Y solo invocamos renderizado de botones + bloqueo
+          renderContextControls();
 
-          // 📄 Ver resumen
-          btnSummary.addEventListener("click", () => {
-            const data = JSON.parse(sessionStorage.getItem("variables") || "{}");
-            const { resources = {}, variables = {} } = data;
-            const table = document.createElement("table");
-            table.style.width = "100%";
-            table.style.borderCollapse = "collapse";
-            const thStyle = "border:1px solid #ccc;padding:6px;background:#e9f9ff;text-align:left;";
-            const tdStyle = "border:1px solid #ccc;padding:6px;";
-            const thead = document.createElement("thead");
-            thead.innerHTML = `
-              <tr>
-                <th style="${thStyle}">Clave</th>
-                <th style="${thStyle}">Valores</th>
-              </tr>`;
-            table.appendChild(thead);
-            const tbody = document.createElement("tbody");
-            [resources, variables].forEach(obj => {
-              Object.entries(obj).forEach(([key, vals]) => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                  <td style="${tdStyle}">${key}</td>
-                  <td style="${tdStyle}">${Array.isArray(vals) ? vals.join(", ") : vals}</td>
-                `;
-                tbody.appendChild(tr);
-              });
-            });
-            table.appendChild(tbody);
-            const popup = document.getElementById("summary-popup");
-            const content = document.getElementById("summary-popup-content");
-            content.innerHTML = "";
-            content.appendChild(table);
-            popup.style.display = "flex";
-            const closeBtn = popup.querySelector(".close-summary-popup");
-            closeBtn.onclick = () => popup.style.display = "none";
-            window.addEventListener("click", e => {
-              if (e.target === popup) popup.style.display = "none";
-            }, { once: true });
-          });
 
         })
         .catch(err => {
           if (loadingOverlay) loadingOverlay.style.display = "none";
           console.error(err);
           showToast("error", err.message);
+
+          const btnSave = document.createElement("button");
+          btnSave.type = "button";
+          btnSave.id   = "ok-button";
+          btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
+          btnContainer.append(btnSave);
+
+          // Vuelve a enlazar el listener
+          btnSave.addEventListener("click", continuar);
         });
     }
 
@@ -795,6 +750,141 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
+    function renderContextControls() {
+      const wrapper      = document.querySelector('.textarea-with-button');
+      const btnContainer = wrapper.querySelector('.context-btns') || (() => {
+        const div = document.createElement('div');
+        div.className = 'context-btns';
+        wrapper.appendChild(div);
+        return div;
+      })();
+
+      // 1) Limpio el contenedor de botones
+      btnContainer.innerHTML = '';
+
+      // 2) Compruebo si hay texto en el contexto
+      const hasCtx = contextInput.innerText.trim().length > 0;
+
+      // 3) Habilito o deshabilito el textarea según corresponda
+      if (hasCtx) {
+        contextInput.setAttribute('contenteditable', 'false');
+      } else {
+        contextInput.setAttribute('contenteditable', 'true');
+      }
+
+      if (!hasCtx) {
+        // — Sólo botón “Subir” —
+        let okBtn = document.getElementById('ok-button');
+        if (okBtn) {
+          okBtn.remove();
+        }
+        okBtn = document.createElement('button');
+        okBtn.type      = 'button';
+        okBtn.id        = 'ok-button';
+        okBtn.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
+        okBtn.addEventListener('click', continuar);
+        btnContainer.appendChild(okBtn);
+
+      } else {
+        // — Botones “Editar” y “Ver resumen” —
+        const btnEdit    = document.createElement('button');
+        btnEdit.type     = 'button';
+        btnEdit.id       = 'edit-context';
+        btnEdit.textContent = '✏️ Editar';
+
+        const btnSummary = document.createElement('button');
+        btnSummary.type  = 'button';
+        btnSummary.id    = 'summary-context';
+        btnSummary.textContent = '📄 Ver resumen';
+
+        btnContainer.append(btnEdit, btnSummary);
+
+        // Callback para “Editar”
+        btnEdit.addEventListener('click', () => {
+          contextInput.setAttribute('contenteditable', 'true');
+          contextInput.focus();
+
+          contextInput.disabled = false;
+          contextInput.focus();
+          btnContainer.innerHTML = '';
+
+          const btnSave = document.createElement('button');
+          btnSave.type      = 'button';
+          btnSave.id        = 'ok-button';
+          btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
+
+          const btnCancel = document.createElement('button');
+          btnCancel.type = 'button';
+          btnCancel.id   = 'cancel-edit';
+          btnCancel.textContent = '✖️ Cancelar';
+
+          btnContainer.append(btnSave, btnCancel);
+
+          // Cancelar edición
+          btnCancel.addEventListener('click', () => {
+            contextInput.innerText    = originalText;
+            contextInput.disabled     = true;
+            renderContextControls();
+          });
+
+          // Guardar edición
+          btnSave.addEventListener('click', () => {
+            sessionStorage.removeItem('variables');
+            sessionStorage.removeItem('restricciones');
+            document.querySelectorAll('.restricciones-list .restriccion-item')
+                    .forEach(li => li.remove());
+            guardarRestricciones();
+            continuar();
+          });
+        });
+
+        // Callback para “Ver resumen”
+        btnSummary.addEventListener('click', () => {
+          const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
+          const { resources = {}, variables = {} } = data;
+
+          const table = document.createElement('table');
+          table.style.width = '100%';
+          table.style.borderCollapse = 'collapse';
+          const thStyle = 'border:1px solid #ccc;padding:6px;background:#e9f9ff;text-align:left;';
+          const tdStyle = 'border:1px solid #ccc;padding:6px;';
+
+          const thead = document.createElement('thead');
+          thead.innerHTML = `
+            <tr>
+              <th style="${thStyle}">Clave</th>
+              <th style="${thStyle}">Valores</th>
+            </tr>`;
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          [resources, variables].forEach(obj => {
+            Object.entries(obj).forEach(([key, vals]) => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td style="${tdStyle}">${key}</td>
+                <td style="${tdStyle}">${
+                  Array.isArray(vals) ? vals.join(', ') : vals
+                }</td>`;
+              tbody.appendChild(tr);
+            });
+          });
+          table.appendChild(tbody);
+
+          const popup = document.getElementById('summary-popup');
+          const content = document.getElementById('summary-popup-content');
+          content.innerHTML = '';
+          content.appendChild(table);
+          popup.style.display = 'flex';
+
+          const closeBtn = popup.querySelector('.close-summary-popup');
+          closeBtn.onclick = () => popup.style.display = 'none';
+          window.addEventListener('click', e => {
+            if (e.target === popup) popup.style.display = 'none';
+          }, { once: true });
+        });
+      }
+    }
 
     function cargarRestricciones() {
         const lista = document.querySelector(".restricciones-list");
