@@ -30,49 +30,67 @@ if (!raw) {
     0
   ) + 1;
 
-  // 4) Inyectar advertencia, filtro y contenedor de tabla
-  const relaxed = [...new Set(JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]'))];
+    // 4) Inyectar advertencia, filtro y contenedor de tabla
+    const relaxed = [...new Set(JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]'))];
 
-  let warningHtml = '';
-  if (relaxed.length) {
-    const items = relaxed.map(nl => `
-      <div class="relaxed-item-box">
-        <div class="relaxed-item-text">${nl}</div>
-        <div class="relaxed-detail">
-          Al relajar esta restricción, permitimos que el modelo encuentre una solución factible aunque se incumpla ligeramente la condición original.
-        </div>
-      </div>
-    `).join('');
+    let warningHtml = '';
+    if (relaxed.length) {
+      // Ahora usamos <li> para que salgan con viñeta
+      const items = relaxed.map(nl => `
+        <li class="relaxed-list-item">${nl}</li>
+      `).join('');
 
-    warningHtml = `
-      <div class="relaxed-warning-panel">
-        <p>⚠️ Se han relajado las siguientes restricciones:</p>
-        <div class="relaxed-list">
-          ${items}
+      // Explicación global oculta
+      const detailedExplanation = `
+        <div id="relaxed-explanation" class="relaxed-explanation" style="display:none;">
+          <strong>¿Qué significa “relajar” una restricción?</strong>
+          <p>
+            Al relajar una restricción permitimos al solver incumplir ligeramente
+            la condición original (por ejemplo, desplazar turnos o reducir mínimos)
+            para garantizar que se encuentre <em>alguna</em> solución factible.
+            Esto evita que un conjunto de reglas demasiado rígidas bloquee totalmente
+            el calendario.
+          </p>
         </div>
+      `;
+
+      warningHtml = `
+        <div class="relaxed-warning-panel">
+          <p id="relaxed-warning-text" style="cursor:pointer;">
+            ⚠️ Se han relajado las siguientes restricciones: (haz clic para más info)
+          </p>
+          <ul class="relaxed-list">
+            ${items}
+          </ul>
+          ${detailedExplanation}
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      ${warningHtml}
+      <div class="filter-container">
+        <label for="worker-filter">Filtrar por trabajador:</label>
+        <select id="worker-filter" class="filter-select">
+          <option value="Todos">Todos</option>
+          ${[...trabajadores].map(t => `<option value="${t}">${t}</option>`).join('')}
+        </select>
       </div>
+      <div id="tabla-container" class="table-wrapper"></div>
     `;
-  }
 
-  container.innerHTML = `
-    ${warningHtml}
-    <div class="filter-container">
-      <label for="worker-filter">Filtrar por trabajador:</label>
-      <select id="worker-filter" class="filter-select">
-        <option value="Todos">Todos</option>
-        ${[...trabajadores].map(t => `<option value="${t}">${t}</option>`).join('')}
-      </select>
-    </div>
-    <div id="tabla-container" class="table-wrapper"></div>
-  `;
+    // 4.1) Toggle de la explicación detallada
+    if (relaxed.length) {
+      const warningText = document.getElementById('relaxed-warning-text');
+      const explanation  = document.getElementById('relaxed-explanation');
+      warningText.addEventListener('click', () => {
+        explanation.style.display =
+          explanation.style.display === 'none' ? 'block' : 'none';
+      });
+    }
 
-  // 4.1) Attach listeners a cada caja para toggle de detalle
-    document.querySelectorAll('.relaxed-item-box').forEach(box => {
-    box.addEventListener('click', () => {
-      const detail = box.querySelector('.relaxed-detail');
-      detail.style.display = detail.style.display === 'block' ? 'none' : 'block';
-    });
-  });
+
+
 
 
 

@@ -878,4 +878,19 @@ transition:     background 0.3s;
 background-color: #ffe8a1;
 }
 
+/* Aviso tras volver si hay restricciones relajadas */
+.relaxed-note {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background-color: #fff3cd;   /* amarillento suave */
+  border: 1px solid #ffeeba;   /* borde crema */
+  border-radius: 4px;
+  color: #856404;               /* texto marrón oscuro */
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+
 

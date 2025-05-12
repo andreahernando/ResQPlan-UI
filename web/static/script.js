@@ -1005,15 +1005,37 @@ document.addEventListener("DOMContentLoaded", function () {
     if (contextInput) contextInput.focus();
 
 });
-// Al volver con history.back(), 'pageshow' siempre se dispara (incluso con cache bfcache)
+// ——— Al volver con history.back(), reaplicar highlight y mostrar aviso ———
 window.addEventListener('pageshow', () => {
   const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
-  document.querySelectorAll('.restriccion-item').forEach(li => {
+  const items    = document.querySelectorAll('.restriccion-item');
+  let hasRelaxed = false;
+
+  items.forEach(li => {
     const texto = li.querySelector('label')?.innerText;
     if (texto && relaxed.includes(texto)) {
       li.classList.add('relaxed-highlight');
+      hasRelaxed = true;
     } else {
       li.classList.remove('relaxed-highlight');
     }
   });
+
+  // Eliminamos aviso previo si existía
+  const prevNote = document.getElementById('relaxed-note');
+  if (prevNote) prevNote.remove();
+
+  // Si hay al menos una relajada, insertamos el aviso
+  if (hasRelaxed) {
+    const note = document.createElement('div');
+    note.id = 'relaxed-note';
+    note.className = 'relaxed-note';
+    note.innerHTML = '⚠️ <strong>Nota:</strong> Las casillas resaltadas indican restricciones que se han relajado para hallar una solución factible.';
+    // Insertar justo tras la lista de restricciones
+    const lista = document.querySelector('.restricciones-list');
+    if (lista && lista.parentNode) {
+      lista.parentNode.insertBefore(note, lista.nextSibling);
+    }
+  }
 });
+

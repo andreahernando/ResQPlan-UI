@@ -145,35 +145,26 @@ body {
   font-weight: bold;
 }
 .relaxed-list {
-  margin: 0;
-  padding-left: 1.2rem;
+  margin: 0 0 1rem 1.2rem;
+  padding: 0;
+  list-style-type: disc;
 }
-/* cajas para cada restricción relajada */
-.relaxed-item-box {
-  border: 1px solid #f00;
-  background: #fee;
+.relaxed-list-item {
+  margin: 0.5rem 0;
+}
+
+
+.relaxed-explanation {
+  margin-top: 1rem;
   padding: 0.75rem;
-  margin-bottom: 0.75rem;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.relaxed-item-box:hover {
-  background: #ffdede;
-}
-.relaxed-item-text {
-  font-weight: bold;
-}
-.relaxed-detail {
-  display: none;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: #fff0f0;
-  border: 1px dashed #f88;
+  background-color: #fff8e1;
+  border-left: 4px solid #f9a825;
   border-radius: 4px;
-  font-size: 0.9rem;
-  color: #800;
+  font-size: 0.95rem;
+  color: #663c00;
 }
+
+
 
 
 
