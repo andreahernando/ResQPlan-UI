@@ -130,3 +130,25 @@ body {
 /* Celdas de estado */
 .active-cell { background-color: #d9ead3; }
 .rest-cell   { background-color: #f4cccc; }
+
+/* Panel de advertencia de restricciones relajadas */
+.relaxed-warning-panel {
+  border: 1px solid #f0a;
+  background: #fee;
+  color: #800;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+}
+.relaxed-warning-panel p {
+  margin: 0 0 0.5rem;
+  font-weight: bold;
+}
+.relaxed-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+.relaxed-item:hover {
+  text-decoration: underline;
+}
+

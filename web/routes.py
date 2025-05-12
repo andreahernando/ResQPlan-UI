@@ -279,7 +279,7 @@ def optimize():
             optimizer.restricciones_validadas[nl]["activa"] = True
 
     # Ejecutar la optimización
-    optimizer.optimizar()
+    optimization_info = optimizer.optimizar()
 
     # Construir la solución
     if optimizer.model.status == gp.GRB.OPTIMAL:
@@ -297,7 +297,8 @@ def optimize():
 
     return jsonify({
         "solution": solution,
-        "status": optimizer.model.status
+        "status": optimizer.model.status,
+        "relaxed_constraints": optimization_info.get("relaxed_constraints", [])
     })
 
 

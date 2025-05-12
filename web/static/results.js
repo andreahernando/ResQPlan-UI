@@ -7,6 +7,7 @@ if (!raw) {
 } else {
   const data = JSON.parse(raw);
 
+
   // 2) Procesar la solución en un objeto 'resumen'
   const resumen = {};
   const trabajadores = new Set();
@@ -29,8 +30,25 @@ if (!raw) {
     0
   ) + 1;
 
-  // 4) Inyectar filtro + contenedor de tabla
+    // 4) Inyectar advertencia, filtro y contenedor de tabla
+  const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
+
+  // Generamos el bloque de warning sólo si hay algo que mostrar
+  let warningHtml = '';
+  if (relaxed.length) {
+    warningHtml = `
+      <div class="relaxed-warning-panel">
+        <p>⚠️ Se han relajado las siguientes restricciones:</p>
+        <ul class="relaxed-list">
+          ${relaxed.map(nl => `<li class="relaxed-item">${nl}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  }
+
+  // Ahora metemos
   container.innerHTML = `
+    ${warningHtml}
     <div class="filter-container">
       <label for="worker-filter">Filtrar por trabajador:</label>
       <select id="worker-filter" class="filter-select">
@@ -40,6 +58,15 @@ if (!raw) {
     </div>
     <div id="tabla-container" class="table-wrapper"></div>
   `;
+
+  // 4.1) Attach listeners a cada <li> relajada
+  document.querySelectorAll('.relaxed-item').forEach(li => {
+    li.style.cursor = 'pointer';
+    li.addEventListener('click', () => {
+      alert(`La restricción “${li.textContent}” fue relajada automáticamente para obtener factibilidad.`);
+    });
+  });
+
 
   // 5) Función para renderizar la tabla según el filtro
   function renderTabla(filtro) {
@@ -101,3 +128,4 @@ function parseKey(key) {
   if (!m) return null;
   return { entidad: m[1], dia: +m[2], franja: +m[3] };
 }
+

@@ -986,6 +986,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // 2) Guardamos resultado en sessionStorage
           sessionStorage.setItem('optimizationResult', JSON.stringify(data));
+          sessionStorage.setItem('relaxedConstraints', JSON.stringify(data.relaxed_constraints || []));
 
           // 3) Redirigimos a la página de resultados
           window.location.href = '/results';
