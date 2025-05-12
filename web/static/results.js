@@ -30,23 +30,30 @@ if (!raw) {
     0
   ) + 1;
 
-    // 4) Inyectar advertencia, filtro y contenedor de tabla
-  const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
+  // 4) Inyectar advertencia, filtro y contenedor de tabla
+  const relaxed = [...new Set(JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]'))];
 
-  // Generamos el bloque de warning sólo si hay algo que mostrar
   let warningHtml = '';
   if (relaxed.length) {
+    const items = relaxed.map(nl => `
+      <div class="relaxed-item-box">
+        <div class="relaxed-item-text">${nl}</div>
+        <div class="relaxed-detail">
+          Al relajar esta restricción, permitimos que el modelo encuentre una solución factible aunque se incumpla ligeramente la condición original.
+        </div>
+      </div>
+    `).join('');
+
     warningHtml = `
       <div class="relaxed-warning-panel">
         <p>⚠️ Se han relajado las siguientes restricciones:</p>
-        <ul class="relaxed-list">
-          ${relaxed.map(nl => `<li class="relaxed-item">${nl}</li>`).join('')}
-        </ul>
+        <div class="relaxed-list">
+          ${items}
+        </div>
       </div>
     `;
   }
 
-  // Ahora metemos
   container.innerHTML = `
     ${warningHtml}
     <div class="filter-container">
@@ -59,13 +66,14 @@ if (!raw) {
     <div id="tabla-container" class="table-wrapper"></div>
   `;
 
-  // 4.1) Attach listeners a cada <li> relajada
-  document.querySelectorAll('.relaxed-item').forEach(li => {
-    li.style.cursor = 'pointer';
-    li.addEventListener('click', () => {
-      alert(`La restricción “${li.textContent}” fue relajada automáticamente para obtener factibilidad.`);
+  // 4.1) Attach listeners a cada caja para toggle de detalle
+    document.querySelectorAll('.relaxed-item-box').forEach(box => {
+    box.addEventListener('click', () => {
+      const detail = box.querySelector('.relaxed-detail');
+      detail.style.display = detail.style.display === 'block' ? 'none' : 'block';
     });
   });
+
 
 
   // 5) Función para renderizar la tabla según el filtro
@@ -127,5 +135,8 @@ function parseKey(key) {
   const m = key.match(regex);
   if (!m) return null;
   return { entidad: m[1], dia: +m[2], franja: +m[3] };
+
 }
+
+
 

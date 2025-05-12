@@ -169,6 +169,7 @@ class ShiftOptimizer:
                         # Recuperar la frase original
                         phrase = self.constraint_descriptions.get(cname, f"(sin mapping para {cname})")
                         relaxed_nls.append(phrase)
+                        relaxed_nls = list(dict.fromkeys(relaxed_nls))
                         print(f"   · {phrase} (relajada: {sv.X:g})")
 
                 # Imprimir al final la lista de frases originales

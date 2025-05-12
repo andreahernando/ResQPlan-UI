@@ -148,7 +148,32 @@ body {
   margin: 0;
   padding-left: 1.2rem;
 }
-.relaxed-item:hover {
-  text-decoration: underline;
+/* cajas para cada restricción relajada */
+.relaxed-item-box {
+  border: 1px solid #f00;
+  background: #fee;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
 }
+.relaxed-item-box:hover {
+  background: #ffdede;
+}
+.relaxed-item-text {
+  font-weight: bold;
+}
+.relaxed-detail {
+  display: none;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #fff0f0;
+  border: 1px dashed #f88;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #800;
+}
+
+
 
