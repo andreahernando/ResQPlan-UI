@@ -144,7 +144,13 @@ document.addEventListener("DOMContentLoaded", function () {
       li.appendChild(deleteBtn);
 
       li.addEventListener("click", async () => {
-        if (currentProjectId) await autoSaveProject();
+          if (currentProjectId) {
+            try {
+              await autoSaveProject();
+            } catch (err) {
+              console.warn("Guardado automático fallido (pero seguimos):", err);
+            }
+          }
 
         document.querySelectorAll("#project-list li").forEach(el => el.classList.remove("active"));
         li.classList.add("active");
@@ -157,6 +163,9 @@ document.addEventListener("DOMContentLoaded", function () {
         currentProjectName = proj.name;
         contextInput.innerText = proj.context || "";
         renderContextControls();
+        if (window.currentGurobiModel) {
+          showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
+        }
 
 
         detectedList.innerHTML = "";

@@ -29,6 +29,10 @@ def create_project():
     data = request.get_json() or {}
     pid = str(uuid4())
     specs = session.get('variables', {})
+    if not specs or "decision_variables" not in specs:
+        specs = {
+            "decision_variables": [],
+        }
     manual = session.get('restricciones', [])
 
     # Tomamos el shift_store si existe, sino lista vacía
@@ -49,7 +53,9 @@ def create_project():
         "detectedConstraints": data.get("detectedConstraints", []),
         "manualConstraints": manual,
         "variables": specs,
-        "validatedConstraints": vc_list
+        "validatedConstraints": vc_list,
+        "gurobiState": data.get("gurobiState", {"vars": [], "cons": [], "objective": "0", "sense": 1})
+
     }
 
     current_app.mongo.db.projects.insert_one(project)
@@ -63,6 +69,15 @@ def load_project(pid):
     project = current_app.mongo.db.projects.find_one({"id": pid}, {"_id": 0})
     if not project:
         return jsonify({"error": "Proyecto no encontrado"}), 404
+
+    specs = project.get('variables', {}) or {}
+    if not isinstance(specs.get("decision_variables"), str):
+        specs["decision_variables"] = ""
+    try:
+        current_app.shift_store = ShiftOptimizer(specs)
+    except Exception as e:
+        current_app.logger.warning(f"No inicializar ShiftOptimizer: {e}")
+        current_app.shift_store = None
 
     # Debug de lo que llega
     print(f"[DEBUG LOAD] Proyecto id={pid} name={project.get('name')}")
@@ -114,7 +129,8 @@ def update_project(pid):
         "detectedConstraints": data.get("detectedConstraints"),
         "manualConstraints": data.get("manualConstraints"),
         "variables": data.get("variables"),
-        "validatedConstraints": vc_list
+        "validatedConstraints": vc_list,
+        "gurobiState": data.get("gurobiState")
     }
     result = current_app.mongo.db.projects.update_one({"id": pid}, {"$set": update})
     if result.matched_count == 0:
@@ -158,6 +174,13 @@ def translate():
 
     # Si todo fue bien…
     session['variables'] = variables
+    detected = variables.get('detected_constraints', [])
+    pid = session.get('current_project_id')
+    if pid:
+        current_app.mongo.db.projects.update_one(
+            {"id": pid},
+            {"$set": {"manualConstraints": detected}}
+        )
     current_app.shift_store = ShiftOptimizer(variables)
     return jsonify({"result": variables}), 200
 
@@ -181,21 +204,45 @@ def edit_constraint():
 
 @routes.route("/api/delete_constraint", methods=["POST"])
 def delete_constraint():
-    data = request.json
+    data = request.json or {}
     nl = data.get("nl")
 
     if not nl:
         return jsonify(success=False, error="No se especificó la restricción."), 400
-
     if not hasattr(current_app, 'shift_store'):
         return jsonify(success=False, error="No se ha inicializado el modelo"), 400
 
     optimizer: ShiftOptimizer = current_app.shift_store
     if nl in optimizer.restricciones_validadas:
+        # 1) Eliminar de memoria
         del optimizer.restricciones_validadas[nl]
+
+        # 2) Persistir en MongoDB
+        pid = session.get('current_project_id')
+        if pid:
+            # 2a) validatedConstraints
+            vc_list = [
+                {"texto": t, "code": info["code"], "activa": info["activa"]}
+                for t, info in optimizer.restricciones_validadas.items()
+            ]
+            # 2b) manualConstraints
+            manual = session.get('restricciones', [])
+            manual = [m for m in manual if m["texto"] != nl]
+
+            current_app.mongo.db.projects.update_one(
+                {"id": pid},
+                {"$set": {
+                    "validatedConstraints": vc_list,
+                    "manualConstraints": manual
+                }}
+            )
+            # mantener en sesión
+            session['restricciones'] = manual
+
         return jsonify(success=True)
     else:
         return jsonify(success=False, error="Restricción no encontrada."), 404
+
 
 @routes.route("/api/view_constraint", methods=["POST"])
 def view_constraint():
@@ -226,35 +273,66 @@ def convert():
     if not nl:
         return jsonify({"message": "No se especificó ninguna restricción."}), 400
 
+    # 2) Comprobar que hay variables en sesión
+    translate_vars = session.get('variables')
+    if not translate_vars:
+        return jsonify({"message": "No hay variables en sesión. Sube un contexto primero."}), 400
+
     try:
-        # 2) Traducción: puede devolver código o {"error": "..."}
-        result = translate_constraint_to_code(nl, session['variables']['variables'])
-
-        # 3) Si el resultado es un dict con error, lo tratamos como fallo de usuario
+        # 3) Traducción a código Gurobi
+        result = translate_constraint_to_code(nl, translate_vars)
         if isinstance(result, dict) and result.get("error"):
-            # devolvemos 400 con ese mensaje
             return jsonify({"message": result["error"]}), 400
-
         code = result
 
-        # 4) Validación Gurobi
         valid = False
         if hasattr(current_app, 'shift_store'):
+            # 4) Validar en memoria (esto llenará ShiftOptimizer.name_to_nl)
             valid = current_app.shift_store.validar_restriccion(nl, code)
-            print(f"[DEBUG CONVERT] Now restricciones_validadas keys: "
-                  f"{list(current_app.shift_store.restricciones_validadas.keys())}")
+            # 4.1) Inyectar en el modelo real para que name_to_nl se consolide
+            if valid:
+                current_app.shift_store.agregar_restriccion(nl)
 
-        # 5) Respuesta exitosa
-        return jsonify({"code": code, "valid": valid}), 200
+            # 5) Persistir estado en MongoDB
+            pid = session.get('current_project_id')
+            if pid:
+                # 5a) validatedConstraints
+                vc_list = [
+                    {"texto": t, "code": info["code"], "activa": info["activa"]}
+                    for t, info in current_app.shift_store.restricciones_validadas.items()
+                ]
+                # 5b) manualConstraints (añadir si es nuevo)
+                manual = session.get('restricciones', [])
+                if not any(m['texto'] == nl for m in manual):
+                    manual.append({"texto": nl, "activa": True})
+                # actualización conjunta
+                current_app.mongo.db.projects.update_one(
+                    {"id": pid},
+                    {"$set": {
+                        "validatedConstraints": vc_list,
+                        "manualConstraints": manual
+                    }}
+                )
+                # mantener en sesión
+                session['restricciones'] = manual
+
+        # 6) Respuesta
+        return jsonify({
+            "code": code,
+            "valid": valid,
+            # <— añadimos aquí el mapeo nombre Gurobi → frase NL
+            "mapping": current_app.shift_store.name_to_nl
+        }), 200
 
     except ValueError as e:
-        # Errores de traducción que lanzan explícitamente ValueError
         return jsonify({"message": str(e)}), 400
-
     except Exception as e:
-        # Cualquier otro fallo interno
         current_app.logger.exception("Error interno en /api/convert")
         return jsonify({"message": f"Error interno: {e}"}), 500
+
+
+
+
 
 
 
@@ -279,7 +357,7 @@ def optimize():
             optimizer.restricciones_validadas[nl]["activa"] = True
 
     # Ejecutar la optimización
-    optimization_info = optimizer.optimizar()
+    optimization_info = optimizer.optimizar() or {}
 
     # Construir la solución
     if optimizer.model.status == gp.GRB.OPTIMAL:
