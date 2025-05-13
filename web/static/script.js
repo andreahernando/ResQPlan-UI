@@ -121,13 +121,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ——— Refrescar la lista de proyectos en la UI ———
   async function refreshProjectOptions() {
-    if (contextWarning) {
-      contextWarning.style.visibility = 'hidden';
-    }
-    // Oculta el panel de restricciones detectadas
-    if (detectedPanel) {
-      detectedPanel.style.display = 'none';
-    }
+  const prevNote = document.getElementById('relaxed-note');
+  if (prevNote) prevNote.remove();
+
+  if (contextWarning) {
+    contextWarning.style.visibility = 'hidden';
+  }
+  // Oculta el panel de restricciones detectadas
+  if (detectedPanel) {
+    detectedPanel.style.display = 'none';
+  }
     projectList.innerHTML = "";
     const projects = await listProjects();
     projects.forEach(p => {
@@ -151,6 +154,8 @@ document.addEventListener("DOMContentLoaded", function () {
       li.appendChild(deleteBtn);
 
       li.addEventListener("click", async () => {
+        const prevNote = document.getElementById('relaxed-note');
+        if (prevNote) prevNote.remove()
         if (contextWarning) contextWarning.style.visibility = 'hidden';
         if (detectedPanel) detectedPanel.style.display = 'none';
         if (currentProjectId) {
@@ -584,30 +589,41 @@ document.addEventListener("DOMContentLoaded", function () {
       });
 
       // Acción eliminar
-      deleteButton.addEventListener("click", async () => {
-        const confirmDelete = confirm("¿Estás seguro de que quieres eliminar esta restricción?");
-        if (!confirmDelete) return;
+    deleteButton.addEventListener("click", async () => {
+      const confirmDelete = confirm("¿Estás seguro de que quieres eliminar esta restricción?");
+      if (!confirmDelete) return;
 
-        try {
-          const res = await fetch("/api/delete_constraint", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nl: label.textContent })
-          });
-          const result = await res.json();
+      try {
+        const res = await fetch("/api/delete_constraint", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nl: label.textContent })
+        });
+        const result = await res.json();
 
-          if (res.ok && result.success) {
-            li.remove();
-            guardarRestricciones();
-            showToast("success", "Restricción eliminada correctamente.");
-          } else {
-            throw new Error(result.error || "Error del servidor");
+        if (res.ok && result.success) {
+          // 1) Elimino el <li> de la restricción
+          li.remove();
+          guardarRestricciones();
+          showToast("success", "Restricción eliminada correctamente.");
+
+          // 2) Compruebo si queda alguna relajada
+          const anyRelaxed = !!document.querySelector(".restriccion-item.relaxed-highlight");
+
+          // 3) Si no queda ninguna, quito también la nota de warning
+          if (!anyRelaxed) {
+            const note = document.getElementById("relaxed-note");
+            if (note) note.remove();
           }
-        } catch (e) {
-          showToast("error", "Error al eliminar restricción.");
-          console.error(e);
+        } else {
+          throw new Error(result.error || "Error del servidor");
         }
-      });
+      } catch (e) {
+        showToast("error", "Error al eliminar restricción.");
+        console.error(e);
+      }
+    });
+
 
       viewButton.addEventListener("click", async (e) => {
         const constraintText = label.textContent;
