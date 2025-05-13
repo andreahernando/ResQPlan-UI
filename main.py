@@ -1,7 +1,7 @@
 # main.py
 from flask import Flask
 from flask_pymongo import PyMongo
-from web.routes import routes  # Importamos las rutas desde routes.py
+from web.routes import routes
 
 # Inicializamos la aplicación Flask
 app = Flask(__name__, template_folder="web/templates", static_folder="web/static")

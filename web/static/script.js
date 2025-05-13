@@ -121,6 +121,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ——— Refrescar la lista de proyectos en la UI ———
   async function refreshProjectOptions() {
+    if (contextWarning) {
+      contextWarning.style.visibility = 'hidden';
+    }
+    // Oculta el panel de restricciones detectadas
+    if (detectedPanel) {
+      detectedPanel.style.display = 'none';
+    }
     projectList.innerHTML = "";
     const projects = await listProjects();
     projects.forEach(p => {
@@ -144,13 +151,15 @@ document.addEventListener("DOMContentLoaded", function () {
       li.appendChild(deleteBtn);
 
       li.addEventListener("click", async () => {
-          if (currentProjectId) {
-            try {
-              await autoSaveProject();
-            } catch (err) {
-              console.warn("Guardado automático fallido (pero seguimos):", err);
-            }
+        if (contextWarning) contextWarning.style.visibility = 'hidden';
+        if (detectedPanel) detectedPanel.style.display = 'none';
+        if (currentProjectId) {
+          try {
+            await autoSaveProject();
+          } catch (err) {
+            console.warn("Guardado automático fallido (pero seguimos):", err);
           }
+        }
 
         document.querySelectorAll("#project-list li").forEach(el => el.classList.remove("active"));
         li.classList.add("active");
@@ -183,7 +192,7 @@ document.addEventListener("DOMContentLoaded", function () {
         sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
 
         deleteProjectBtn.disabled = false;
-        showToast("info", `Proyecto “${proj.name}” cargado`);
+        showToast("success", `Proyecto “${proj.name}” cargado`);
         sidebar.classList.remove("open");
 
         currentGurobiModel = rebuildGurobiModel(proj.gurobiState);
@@ -997,6 +1006,8 @@ document.addEventListener("DOMContentLoaded", function () {
           sessionStorage.setItem('optimizationResult', JSON.stringify(data));
           sessionStorage.setItem('relaxedConstraints', JSON.stringify(data.relaxed_constraints || []));
 
+          sessionStorage.setItem('savedContext', contextInput.innerText);
+
           // 3) Redirigimos a la página de resultados
           window.location.href = '/results';
         } catch (error) {
@@ -1013,38 +1024,50 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     if (contextInput) contextInput.focus();
 
+    // ——— Al volver con history.back(), restaurar contexto, reaplicar highlight y mostrar aviso ———
+    window.addEventListener('pageshow', () => {
+      // 0) Restaurar contexto si lo teníamos guardado
+      const contextInput = document.getElementById('context');
+      const savedCtx = sessionStorage.getItem('savedContext');
+      if (savedCtx !== null && contextInput) {
+        contextInput.innerText = savedCtx;
+        contextInput.setAttribute('contenteditable', 'false');
+        renderContextControls();
+      }
+
+      // 1) Reaplicar highlight de restricciones relajadas
+      const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
+      const items   = document.querySelectorAll('.restriccion-item');
+      let hasRelaxed = false;
+
+      items.forEach(li => {
+        const texto = li.querySelector('label')?.innerText;
+        if (texto && relaxed.includes(texto)) {
+          li.classList.add('relaxed-highlight');
+          hasRelaxed = true;
+        } else {
+          li.classList.remove('relaxed-highlight');
+        }
+      });
+
+      // 2) Eliminamos aviso previo si existía
+      const prevNote = document.getElementById('relaxed-note');
+      if (prevNote) prevNote.remove();
+
+      // 3) Si hay al menos una relajada, insertamos el aviso
+      if (hasRelaxed) {
+        const note = document.createElement('div');
+        note.id = 'relaxed-note';
+        note.className = 'relaxed-note';
+        note.innerHTML = '⚠️ <strong>Nota:</strong> Las casillas resaltadas indican restricciones que se han relajado para hallar una solución factible.';
+        const lista = document.querySelector('.restricciones-list');
+        if (lista && lista.parentNode) {
+          lista.parentNode.insertBefore(note, lista.nextSibling);
+        }
+      }
+    });
+
+
 });
-// ——— Al volver con history.back(), reaplicar highlight y mostrar aviso ———
-window.addEventListener('pageshow', () => {
-  const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
-  const items    = document.querySelectorAll('.restriccion-item');
-  let hasRelaxed = false;
 
-  items.forEach(li => {
-    const texto = li.querySelector('label')?.innerText;
-    if (texto && relaxed.includes(texto)) {
-      li.classList.add('relaxed-highlight');
-      hasRelaxed = true;
-    } else {
-      li.classList.remove('relaxed-highlight');
-    }
-  });
-
-  // Eliminamos aviso previo si existía
-  const prevNote = document.getElementById('relaxed-note');
-  if (prevNote) prevNote.remove();
-
-  // Si hay al menos una relajada, insertamos el aviso
-  if (hasRelaxed) {
-    const note = document.createElement('div');
-    note.id = 'relaxed-note';
-    note.className = 'relaxed-note';
-    note.innerHTML = '⚠️ <strong>Nota:</strong> Las casillas resaltadas indican restricciones que se han relajado para hallar una solución factible.';
-    // Insertar justo tras la lista de restricciones
-    const lista = document.querySelector('.restricciones-list');
-    if (lista && lista.parentNode) {
-      lista.parentNode.insertBefore(note, lista.nextSibling);
-    }
-  }
-});
 
