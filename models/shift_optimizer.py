@@ -137,9 +137,9 @@ class ShiftOptimizer:
         if status in (GRB.OPTIMAL, GRB.SUBOPTIMAL):
             print(f"Objetivo: {self.model.ObjVal}")
             print("Variables activadas (>0.5):")
-            for key, var in self.decision_vars.items():
+            for var in self.model.getVars():
                 if var.X > 0.5:
-                    print(f"  · {key} = {var.X}")
+                    print(f"  · {var.VarName} = {var.X}")
             print("════════════════════════════════════════")
             return
         # … dentro de ShiftOptimizer.optimizar(), en el bloque infeasible …

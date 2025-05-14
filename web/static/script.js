@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentProjectName = "";
   let currentGurobiModel = null;
 
+
   renderContextControls();
 
   // — Función auxiliar para parsear expresiones lineales —
@@ -121,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ——— Refrescar la lista de proyectos en la UI ———
   async function refreshProjectOptions() {
-  const prevNote = document.getElementById('relaxed-note');
+    let prevNote = document.getElementById('relaxed-note');
   if (prevNote) prevNote.remove();
 
   if (contextWarning) {
@@ -176,6 +177,8 @@ document.addEventListener("DOMContentLoaded", function () {
         currentProjectId = proj.id;
         currentProjectName = proj.name;
         contextInput.innerText = proj.context || "";
+        originalText = contextInput.innerText;
+        sessionStorage.setItem('savedContext', contextInput.innerText);
         renderContextControls();
         if (window.currentGurobiModel) {
           showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
@@ -233,7 +236,7 @@ document.addEventListener("DOMContentLoaded", function () {
               rhs: c.rhs
             })),
             objective: currentGurobiModel.getObjective().toString(),
-            sense: currentGurobiModel.get(gp.GRB.IntAttr.ModelSense)
+            sense: currentGurobiModel.get(GRB.IntAttr.ModelSense)
           }
         : { vars: [], cons: [], objective: "0", sense: 1 }
     };
@@ -410,7 +413,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
           originalText = ctx;
           contextInput.setAttribute('contenteditable', 'false');
-
+          sessionStorage.setItem('savedContext', contextInput.innerText);
           // 4) Mostramos el panel de restricciones manuales
           const restrSection = document.querySelector(".container");
           if (restrSection) restrSection.style.display = "flex";
@@ -607,6 +610,7 @@ document.addEventListener("DOMContentLoaded", function () {
           guardarRestricciones();
           showToast("success", "Restricción eliminada correctamente.");
 
+          await autoSaveProject();
           // 2) Compruebo si queda alguna relajada
           const anyRelaxed = !!document.querySelector(".restriccion-item.relaxed-highlight");
 
@@ -768,6 +772,7 @@ document.addEventListener("DOMContentLoaded", function () {
           await new Promise(r => setTimeout(r, 1000));
           return intentarConvertir(constraint, intentos - 1);
         }
+
       }
     }
 
@@ -874,6 +879,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Callback para “Editar”
         btnEdit.addEventListener('click', () => {
+          let prevNote = document.getElementById('relaxed-note');
+          if (prevNote) prevNote.remove();
           contextInput.setAttribute('contenteditable', 'true');
           contextInput.focus();
 
@@ -1037,6 +1044,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     window.addEventListener("beforeunload", async (e) => {
       if (currentProjectId) await autoSaveProject();
+      sessionStorage.setItem('savedContext', contextInput.innerText.trim());
     });
     if (contextInput) contextInput.focus();
 
@@ -1067,7 +1075,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
 
       // 2) Eliminamos aviso previo si existía
-      const prevNote = document.getElementById('relaxed-note');
+      let prevNote = document.getElementById('relaxed-note');
       if (prevNote) prevNote.remove();
 
       // 3) Si hay al menos una relajada, insertamos el aviso
