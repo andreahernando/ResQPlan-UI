@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const loadingOverlay = document.getElementById("loading-overlay");
   if (loadingOverlay) loadingOverlay.style.display = "none";
 
+
   // Panel y lista de restricciones detectadas
   const detectedPanel = document.getElementById('detected-panel');
   const detectedList = document.getElementById('detected-constraints');
@@ -40,8 +41,71 @@ document.addEventListener("DOMContentLoaded", function () {
   let currentProjectName = "";
   let currentGurobiModel = null;
 
+  const storedId = sessionStorage.getItem('currentProjectId');
+  const storedName = sessionStorage.getItem('currentProjectName');
 
+  if (storedId) {
+    currentProjectId = storedId;
+    currentProjectName = storedName;
+  }
+
+  setupEditProjectName();
   renderContextControls();
+
+  document.querySelectorAll('.info-icon').forEach(icon => {
+    // Texto de ayuda según ID
+    const helpText = {
+      'info-context': 'Aquí debes escribir el contexto de negocio: información general y datos relevantes para la optimización.',
+      'info-constraints': 'Aquí introduces las restricciones en lenguaje natural, una por línea, que tu modelo debe cumplir.'
+    }[icon.id];
+
+    // Crea el elemento tooltip
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    tooltip.innerText = helpText;
+    document.body.appendChild(tooltip);
+
+    // Posicionar y mostrar
+    icon.addEventListener('mouseenter', e => {
+      const rect = icon.getBoundingClientRect();
+      tooltip.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+      tooltip.style.left = (rect.left + window.scrollX) + 'px';
+      tooltip.style.display = 'block';
+    });
+    // Ocultar al salir
+    icon.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+  });
+
+
+  function setupEditProjectName() {
+    const editBtn = document.getElementById("edit-project-name");
+    if (!editBtn) return;
+    editBtn.onclick = async () => {
+      const newName = prompt("Nuevo nombre para el proyecto:", currentProjectName);
+      if (!newName || newName.trim() === "" || newName === currentProjectName) return;
+      try {
+        await fetch(`/api/projects/${currentProjectId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        // Actualizar UI
+        currentProjectName = newName.trim();
+        document.getElementById("project-title").textContent = currentProjectName;
+        document.querySelectorAll("#project-list li").forEach(li => {
+          if (li.dataset.id == currentProjectId) li.firstChild.textContent = currentProjectName;
+        });
+        showToast("success", `Proyecto renombrado a “${currentProjectName}”`);
+      } catch (err) {
+        console.error(err);
+        showToast("error", "No se pudo renombrar el proyecto.");
+      }
+    };
+  }
+
+
 
   // — Función auxiliar para parsear expresiones lineales —
   function parseLinExpr(exprStr, varsMap) {
@@ -122,95 +186,181 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ——— Refrescar la lista de proyectos en la UI ———
   async function refreshProjectOptions() {
+    const headerDiv = document.getElementById("project-header");
+    const titleSpan  = document.getElementById("project-title");
+    if (currentProjectId) {
+      headerDiv.style.display = "flex";
+      titleSpan.textContent  = currentProjectName;
+    } else {
+      headerDiv.style.display = "none";
+    }
+    document.getElementById("save-controls").style.display = "none";
     let prevNote = document.getElementById('relaxed-note');
-  if (prevNote) prevNote.remove();
+    if (prevNote) prevNote.remove();
 
-  if (contextWarning) {
-    contextWarning.style.visibility = 'hidden';
-  }
-  // Oculta el panel de restricciones detectadas
-  if (detectedPanel) {
-    detectedPanel.style.display = 'none';
-  }
-    projectList.innerHTML = "";
-    const projects = await listProjects();
-    projects.forEach(p => {
-      const li = document.createElement("li");
-      li.textContent = p.name;
-      li.dataset.id = p.id;
+    if (contextWarning) {
+      contextWarning.style.visibility = 'hidden';
+    }
+    // Oculta el panel de restricciones detectadas
+    if (detectedPanel) {
+      detectedPanel.style.display = 'none';
+    }
+      projectList.innerHTML = "";
+      const projects = await listProjects();
+      projects.forEach(p => {
+        const li = document.createElement("li");
+        li.textContent = p.name;
+        li.dataset.id = p.id;
 
-      // Crear el botón de borrar con un icono
-      const deleteBtn = document.createElement("button");
-      deleteBtn.classList.add("delete-btn");
-      deleteBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`; // Icono de papelera
-      deleteBtn.addEventListener("click", async (e) => {
-        e.stopPropagation(); // Evita que el clic se propague al li
-        if (!confirm(`¿Borrar el proyecto “${p.name}”?`)) return;
-        await deleteProject(p.id);
-        showToast("warning", `Proyecto “${p.name}” eliminado`);
-        await refreshProjectOptions(); // Refrescar la lista después de borrar
-      });
+        // Dentro de refreshProjectOptions(), justo después de crear deleteBtn:
+        const duplicateBtn = document.createElement("button");
+        duplicateBtn.classList.add("duplicate-btn");
+        duplicateBtn.innerHTML = `<i class="fas fa-clone"></i>`; // Icono de duplicar
+        duplicateBtn.title = "Duplicar proyecto";
 
-      // Añadir el botón de borrar al li
-      li.appendChild(deleteBtn);
+        duplicateBtn.addEventListener("click", async (e) => {
+          e.stopPropagation(); // para no disparar el click de carga del proyecto
 
-      li.addEventListener("click", async () => {
-        const prevNote = document.getElementById('relaxed-note');
-        if (prevNote) prevNote.remove()
-        if (contextWarning) contextWarning.style.visibility = 'hidden';
-        if (detectedPanel) detectedPanel.style.display = 'none';
-        if (currentProjectId) {
-          try {
-            await autoSaveProject();
-          } catch (err) {
-            console.warn("Guardado automático fallido (pero seguimos):", err);
+          // 1) Cargar los datos completos del proyecto original
+          const orig = await loadProject(p.id);
+          if (orig.error) {
+            return showToast("error", "No se pudo cargar el proyecto original.");
           }
-        }
 
-        document.querySelectorAll("#project-list li").forEach(el => el.classList.remove("active"));
-        li.classList.add("active");
+          // 2) Generar un nombre nuevo con sufijo "1"
+          let newName = `${orig.name}1`;
 
-        const proj = await loadProject(p.id);
-        if (proj.error) return showToast("error", "Error cargando proyecto");
+          const allNames = (await listProjects()).map(x => x.name);
+          let suffix = 1;
+          while (allNames.includes(newName)) {
+            newName = `${orig.name} ${++suffix}`;
+          }
 
-        // ——— Recarga de la UI —————————————————————————————————————
-        currentProjectId = proj.id;
-        currentProjectName = proj.name;
-        contextInput.innerText = proj.context || "";
-        originalText = contextInput.innerText;
-        sessionStorage.setItem('savedContext', contextInput.innerText);
-        renderContextControls();
-        if (window.currentGurobiModel) {
-          showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
-        }
+          // 3) Construir el payload copiando toda la info y cambiando solo el nombre
+          const clonePayload = {
+            name: newName,
+            context: orig.context,
+            detectedConstraints: orig.detectedConstraints,
+            manualConstraints: orig.manualConstraints,
+            variables: orig.variables,
+            gurobiState: orig.gurobiState
+          };
 
+          // 4) Enviar a la API para crear el duplicado
+          try {
+            const res = await fetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(clonePayload)
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
 
-        detectedList.innerHTML = "";
-        (proj.detectedConstraints || []).forEach(nl => {
-          const item = document.createElement("li");
-          item.textContent = nl;
-          detectedList.appendChild(item);
+            showToast("success", `Proyecto duplicado como “${newName}”`);
+            await refreshProjectOptions();
+          } catch (err) {
+            console.error(err);
+            showToast("error", "Error al duplicar el proyecto.");
+          }
         });
-        detectedPanel.style.display = proj.detectedConstraints?.length ? "block" : "none";
 
-        sessionStorage.setItem("restricciones", JSON.stringify(proj.manualConstraints || []));
-        document.querySelector(".restricciones-list").innerHTML = "";
-        cargarRestricciones();
+        // Finalmente añádelo junto al deleteBtn:
+        li.appendChild(duplicateBtn);
 
-        sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
 
-        deleteProjectBtn.disabled = false;
-        showToast("success", `Proyecto “${proj.name}” cargado`);
-        sidebar.classList.remove("open");
 
-        currentGurobiModel = rebuildGurobiModel(proj.gurobiState);
-        window.currentGurobiModel = currentGurobiModel;
-        showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
+        // Crear el botón de borrar con un icono
+        const deleteBtn = document.createElement("button");
+        deleteBtn.classList.add("delete-btn");
+        deleteBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`; // Icono de papelera
+        deleteBtn.addEventListener("click", async (e) => {
+          e.stopPropagation(); // Evita que el clic se propague al li
+          if (!confirm(`¿Borrar el proyecto “${p.name}”?`)) return;
+          await deleteProject(p.id);
+          showToast("warning", `Proyecto “${p.name}” eliminado`);
+          await refreshProjectOptions(); // Refrescar la lista después de borrar
+        });
+
+        // Añadir el botón de borrar al li
+        li.appendChild(deleteBtn);
+
+        li.addEventListener("click", async () => {
+          const prevNote = document.getElementById('relaxed-note');
+          if (prevNote) prevNote.remove()
+          if (contextWarning) contextWarning.style.visibility = 'hidden';
+          if (detectedPanel) detectedPanel.style.display = 'none';
+          if (currentProjectId) {
+            try {
+              await autoSaveProject();
+            } catch (err) {
+              console.warn("Guardado automático fallido (pero seguimos):", err);
+            }
+          }
+
+          document.querySelectorAll("#project-list li").forEach(el => el.classList.remove("active"));
+          li.classList.add("active");
+
+          const proj = await loadProject(p.id);
+          if (proj.error) return showToast("error", "Error cargando proyecto");
+
+          // ——— Recarga de la UI —————————————————————————————————————
+          currentProjectId = proj.id;
+          currentProjectName = proj.name;
+          sessionStorage.setItem('currentProjectId', proj.id);
+          sessionStorage.setItem('currentProjectName', proj.name);
+          contextInput.innerText = proj.context || "";
+          originalText = contextInput.innerText;
+
+          sessionStorage.setItem('savedContext', contextInput.innerText);
+          renderContextControls();
+          if (window.currentGurobiModel) {
+            showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
+          }
+
+          // ——— Mostrar título en header ———
+          const headerDiv = document.getElementById("project-header");
+          const titleSpan = document.getElementById("project-title");
+
+          if (proj.id) {
+            headerDiv.style.display = "flex";
+            titleSpan.textContent = proj.name;
+          } else {
+            headerDiv.style.display = "none";
+          }
+
+          const saveControls = document.getElementById("save-controls");
+          saveControls.style.display = "flex";
+
+          setupEditProjectName()
+
+
+
+          detectedList.innerHTML = "";
+          (proj.detectedConstraints || []).forEach(nl => {
+            const item = document.createElement("li");
+            item.textContent = nl;
+            detectedList.appendChild(item);
+          });
+          detectedPanel.style.display = proj.detectedConstraints?.length ? "block" : "none";
+
+          sessionStorage.setItem("restricciones", JSON.stringify(proj.manualConstraints || []));
+          document.querySelector(".restricciones-list").innerHTML = "";
+          cargarRestricciones();
+
+          sessionStorage.setItem("variables", JSON.stringify(proj.variables || {}));
+
+          deleteProjectBtn.disabled = false;
+          showToast("success", `Proyecto “${proj.name}” cargado`);
+          sidebar.classList.remove("open");
+
+          currentGurobiModel = rebuildGurobiModel(proj.gurobiState);
+          window.currentGurobiModel = currentGurobiModel;
+          showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
+        });
+
+        projectList.appendChild(li);
       });
-
-      projectList.appendChild(li);
-    });
-  }
+    }
 
   async function autoSaveProject() {
     if (!currentProjectId) return;
@@ -394,18 +544,84 @@ document.addEventListener("DOMContentLoaded", function () {
             // 1) Coger el texto plano original
             let html = contextInput.innerText;
 
-            // 2) Para cada NL detectada, escapamos y envolvemos en <mark>
+            // 2) Para cada NL detectada, reemplazamos cada aparición
+            //    por un <mark> con data-nl y clase “clickable”
             p.result.detected_constraints.forEach(nl => {
               const esc = nl.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
               const regex = new RegExp(`(${esc})`, 'g');
-              html = html.replace(regex, `<mark class="highlight">$1</mark>`);
+              html = html.replace(
+                regex,
+                `<mark class="highlight clickable" data-nl="${nl}">$1</mark>`
+              );
             });
 
             // 3) Inyectar el HTML con los <mark> dentro del div editable
             contextInput.innerHTML = html;
 
+
             // 4) Ocultamos el panel de lista porque ya no lo usamos
             detectedPanel.style.display = 'none';
+
+            // 5) Hacer cada <mark.clickable> “respondedor” a clicks
+            contextInput.querySelectorAll('mark.highlight.clickable').forEach(mark => {
+              // 1) Estilos “clicable”
+              mark.style.cursor = 'pointer';
+              mark.title = 'Haz clic para agregar esta restricción';
+
+              mark.addEventListener('click', async () => {
+                const nl = mark.dataset.nl;
+                if (mark.classList.contains('added')) return;  // ya agregado
+
+                // 2) Confirmación
+                const confirmar = confirm(`¿Agregar la restricción:\n\n“${nl}”?`);
+                if (!confirmar) return;
+
+                // 3) Preparamos la barra de progreso para 1 ítem
+                const progressContainer = document.getElementById('progress-container');
+                const progressBar       = document.getElementById('progress-bar');
+                const progressLabel     = document.getElementById('progress-label');
+                progressBar.max   = 1;
+                progressBar.value = 0;
+                progressLabel.textContent = `Procesando 1 de 1…`;
+                progressContainer.style.display = 'block';
+
+                // 4) Feedback inmediato en el mark
+                mark.classList.add('adding');
+                mark.textContent = '';
+
+                try {
+                  // 5) Llamada a tu función de validación
+                  await intentarConvertir(nl);
+
+                  // 6) Actualizamos la barra de progreso
+                  progressBar.value = 1;
+                  progressLabel.textContent = `Procesado 0 de 1`;
+
+                  // 7) Reconstruimos todo el contexto sin los <mark>
+                  const textoPlano = contextInput.innerText;
+                  contextInput.innerHTML = textoPlano;
+                  sessionStorage.setItem('savedContext', contextInput.innerText);
+
+                  // 8) Guardado automático en backend
+                  await autoSaveProject();
+                  showToast('success', `“${nl}” agregada correctamente.`);
+
+                } catch (err) {
+                  console.error(err);
+                  // Restauramos el mark original
+                  mark.classList.remove('adding');
+                  mark.textContent = nl;
+                  alert('Error al agregar la restricción. Por favor, inténtalo de nuevo.');
+
+                } finally {
+                  // 9) Ocultamos la barra de progreso
+                  progressContainer.style.display = 'none';
+                }
+              });
+            });
+
+
+
           } else {
             // Ocultar el warning si no hay restricciones
             contextWarning.style.visibility = 'hidden';
@@ -442,8 +658,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (okButton) okButton.addEventListener("click", continuar);
-
-
 
 
     function guardarRestricciones() {
@@ -608,6 +822,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // 1) Elimino el <li> de la restricción
           li.remove();
           guardarRestricciones();
+          updateManualConstraintsInfo()
           showToast("success", "Restricción eliminada correctamente.");
 
           await autoSaveProject();
@@ -757,6 +972,7 @@ document.addEventListener("DOMContentLoaded", function () {
         lista.appendChild(li);
 
         guardarRestricciones();
+        updateManualConstraintsInfo()
         showToast("success", "Restricción añadida correctamente.");
 
       } catch (err) {
@@ -951,10 +1167,19 @@ document.addEventListener("DOMContentLoaded", function () {
           });
           table.appendChild(tbody);
 
-          const popup = document.getElementById('summary-popup');
+          const popup   = document.getElementById('summary-popup');
           const content = document.getElementById('summary-popup-content');
           content.innerHTML = '';
+
+          // 1) Crea y estiliza el título
+          const title = document.createElement('h2');
+          title.textContent  = 'Variables identificadas';
+
+
+          // 2) Inserta el título y luego la tabla
+          content.appendChild(title);
           content.appendChild(table);
+
           popup.style.display = 'flex';
 
           const closeBtn = popup.querySelector('.close-summary-popup');
@@ -988,6 +1213,7 @@ document.addEventListener("DOMContentLoaded", function () {
             attachInlineEditor(li, label, guardarRestricciones, showToast);
             lista.appendChild(li);
         });
+        updateManualConstraintsInfo()
     }
 
     // cargar al inicio
@@ -1089,8 +1315,74 @@ document.addEventListener("DOMContentLoaded", function () {
           lista.parentNode.insertBefore(note, lista.nextSibling);
         }
       }
+
+      setupSaveHandlers()
+
     });
 
+    // ——— Estado de guardado ———
+    let isSaved = true;
+    const saveStatus  = document.getElementById("save-status");
+    const saveButton  = document.getElementById("save-button");
+
+    // Actualiza texto y estado del botón
+    function setupSaveHandlers() {
+      const saveStatus = document.getElementById("save-status");
+      const saveButton = document.getElementById("save-button");
+
+      function updateSaveUI() {
+        if (isSaved) {
+          saveStatus.textContent = "Todo guardado ✔️";
+          saveButton.disabled = true;
+        } else {
+          saveStatus.textContent = "Cambios sin guardar ⚠️";
+          saveButton.disabled = false;
+        }
+      }
+
+      function markDirty() {
+        if (isSaved) {
+          isSaved = false;
+          updateSaveUI();
+        }
+      }
+
+      // Asociar eventos que marcan el estado sucio
+      contextInput.addEventListener("input", markDirty);
+      document.querySelector(".restricciones-list").addEventListener("change", markDirty);
+      document.querySelector(".restricciones-list").addEventListener("click", markDirty);
+
+      // Listener para guardar manualmente
+      saveButton.addEventListener("click", async () => {
+        saveStatus.textContent = "Guardando…";
+        saveButton.disabled = true;
+        try {
+          await autoSaveProject();
+          isSaved = true;
+          updateSaveUI();
+          showToast("success", "Todos los cambios se han guardado.");
+        } catch (err) {
+          console.error(err);
+          saveStatus.textContent = "Error al guardar ❌";
+          saveButton.disabled = false;
+          showToast("error", "No se pudo guardar manualmente.");
+        }
+      });
+
+      // Inicializar el estado
+      updateSaveUI();
+    }
+    function updateManualConstraintsInfo() {
+      const info = document.getElementById('no-constraints-info');
+      const lista = document.querySelector('.restricciones-list');
+      if (!lista) return;
+      // si no hay elementos o todos están removidos, mostramos info
+      if (lista.children.length === 0) {
+        info.style.display = 'block';
+      } else {
+        info.style.display = 'none';
+      }
+    }
 
 });
 

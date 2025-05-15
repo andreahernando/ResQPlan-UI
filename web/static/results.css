@@ -133,9 +133,9 @@ body {
 
 /* Panel de advertencia de restricciones relajadas */
 .relaxed-warning-panel {
-  border: 1px solid #f0a;
-  background: #fee;
-  color: #800;
+  border: 1px solid #e0a96d;         /* naranja suave y apagado */
+  background: #fff7ed;               /* fondo cálido pero claro */
+  color: #995c00;                    /* texto marrón anaranjado apagado */
   padding: 1rem;
   margin-bottom: 1.5rem;
   border-radius: 4px;
@@ -144,6 +144,7 @@ body {
   margin: 0 0 0.5rem;
   font-weight: bold;
 }
+
 .relaxed-list {
   margin: 0 0 1rem 1.2rem;
   padding: 0;
@@ -153,18 +154,12 @@ body {
   margin: 0.5rem 0;
 }
 
-
 .relaxed-explanation {
   margin-top: 1rem;
   padding: 0.75rem;
-  background-color: #fff8e1;
-  border-left: 4px solid #f9a825;
+  background-color: #fff3e0;         /* fondo suave, mantiene armonía */
+  border-left: 4px solid #ffcc80;    /* borde suave y claro */
   border-radius: 4px;
   font-size: 0.95rem;
-  color: #663c00;
+  color: #8d4b00;                    /* texto más cálido pero no intenso */
 }
-
-
-
-
-

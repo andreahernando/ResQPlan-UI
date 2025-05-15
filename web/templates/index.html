@@ -13,13 +13,26 @@
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
-  <!-- Cabecera única -->
   <header class="main-header">
-    <h1>ResQPlan</h1>
     <button id="toggle-sidebar" class="sidebar-toggle" aria-label="Mostrar proyectos">
       <i class="fas fa-bars"></i>
     </button>
+
+    <h1 class="logo">ResQPlan</h1>
+
+    <div id="project-header">
+      <span id="project-title"></span>
+      <button id="edit-project-name" title="Editar nombre del proyecto">✏️</button>
+    </div>
+    <div id="save-controls" style="display: none;">
+    <span id="save-status">✔️</span>
+    <button id="save-button" disabled aria-label="Guardar">
+      <i class="fas fa-save"></i>
+    </button>
+  </div>
   </header>
+
+
 
   <!-- Sidebar proyectos -->
   <aside id="project-sidebar" class="project-sidebar">
@@ -54,13 +67,15 @@
 
   <!-- Panel de contexto -->
   <div class="context-panel">
-    <h2>Describe el contexto en lenguaje natural</h2>
+    <h2>Describe el contexto en lenguaje natural
+    <i class="fas fa-info-circle info-icon" id="info-context" aria-label="Más información"></i>
+    </h2>
 
     <div class="textarea-with-button">
       <div id="context"
            contenteditable="true"
            class="context-editor"
-           data-placeholder="Ejemplo: …">
+           data-placeholder="Ejemplo: ">
         <br>
       </div>
 
@@ -88,7 +103,11 @@
   <!-- Panel de restricciones -->
   <div class="container">
     <div class="panel">
-      <h2>Ingresar Restricciones</h2>
+      <h2>
+        Ingresar Restricciones
+        <i class="fas fa-info-circle info-icon" id="info-constraints" aria-label="Más información"></i>
+
+      </h2>
       <textarea id="constraint"
                 placeholder="Ejemplo: Ningún bombero puede trabajar más de 40 horas semanales..."></textarea>
       <div class="button-container">
@@ -99,7 +118,12 @@
 
     <div class="panel">
       <h2>Restricciones Añadidas</h2>
-      <div class="restricciones-list"></div>
+      <div id="manual-constraints-panel">
+        <div id="no-constraints-info" class="info-note">
+          ⚙️ Aquí aparecerán las restricciones que añadas.
+        </div>
+        <ul class="restricciones-list"></ul>
+      </div>
       <div id="progress-container" style="display:none; margin-top:1rem;">
         <label for="progress-bar" id="progress-label">Procesando 0 de 0…</label>
         <progress id="progress-bar" value="0" max="0" style="width:100%;"></progress>

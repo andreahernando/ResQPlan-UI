@@ -1,29 +1,86 @@
+:root {
+  --primary-color: #007bff;
+}
+
 /* General */
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Encabezado */
 .main-header {
-    width: 100%;
-    background-color: #007bff;
-    color: white;
-    padding: 10px 20px;
-    text-align: left;
-    display: flex;
-    align-items: center;
+  width: 100%;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;      /* ¡desde la izquierda! */
+  position: relative;               /* para el absolute interno */
 }
 
-.main-header h1 {
-    margin: 0;
-    font-size: 24px;
+.main-header .logo {
+  margin: 0;
+  font-size: 24px;
 }
+
+/* bloque del nombre de proyecto */
+#project-header {
+  display: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Estilos nuevos */
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+}
+
+#project-title {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  letter-spacing: 0.5px;
+}
+
+#edit-project-name {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #fff;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+#edit-project-name:hover {
+  opacity: 1;
+}
+
+#project-header span {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+#project-header button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-size: 1rem;
+}
+
 
 /* Panel superior para contexto */
 .context-panel {
@@ -32,18 +89,16 @@ body {
     min-height: auto;
     background-color: #dfeffc;
     border-radius: 10px;
-    padding: 20px 30px;        /* más lateral para centrado */
+    padding: 20px 30px;        /
     margin-top: 30px;
     text-align: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-
 .context-panel h2 {
-    font-size: 20px;            /* texto del título más pequeño */
+    font-size: 20px;
     margin-bottom: 8px;
 }
-
 
 .context-editor {
     width: 100%;
@@ -71,7 +126,7 @@ body {
 
 /* Estilo de resaltado suave naranja */
 mark.highlight {
-    background-color: rgba(255, 140, 0, 0.35); /* naranja más visible */
+    background-color: rgba(255, 140, 0, 0.35);
     text-decoration: none;
     border-radius: 3px;
     padding: 0 2px;
@@ -82,7 +137,7 @@ mark.highlight {
   justify-content: space-between;
   align-items: center;
   margin-top: 0.6rem;
-  flex-wrap: wrap; /* Evita desbordes en pantallas pequeñas */
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
@@ -93,9 +148,9 @@ mark.highlight {
   padding: 0.6rem 1rem;
   border-radius: 0.5rem;
   font-size: 0.9rem;
-  max-width: 70%;     /* Más corto para dejar espacio al botón */
+  max-width: 70%;
   text-align: left;
-  margin: 0;          /* Quitamos margen para que no empuje el botón */
+  margin: 0;
 }
 
 .context-btns {
@@ -106,7 +161,7 @@ mark.highlight {
 }
 
 .context-btns button {
-  background-color: #007bff;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -130,7 +185,7 @@ mark.highlight {
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
-    margin-top: 0.5rem;     /* o el espacio que necesites */
+    margin-top: 0.5rem;
 }
 
 
@@ -145,21 +200,22 @@ mark.highlight {
 .panel {
   width: 95%;
   max-width: 1000px;
-  background-color: #dfeffc;            /* mismo fondo suave */
-  border-radius: 10px;                  /* esquinas redondeadas */
-  padding: 20px 30px;                   /* más padding lateral */
-  margin: 30px auto;                    /* centrado con espacio arriba */
+  background-color: #dfeffc;
+  border-radius: 10px;
+  padding: 20px 30px;
+  margin: 30px auto;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
   align-items: stretch;
+
 }
 
 /* Título dentro del panel, si lo tuvieras */
 .panel h2 {
   font-size: 20px;
   margin-bottom: 8px;
-  text-align: left;
+  text-align: center;
 }
 
 /* Textarea de entrada: igual que .context-panel textarea */
@@ -177,7 +233,7 @@ mark.highlight {
 }
 
 .panel button {
-  background-color: #007bff;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -297,7 +353,7 @@ mark.highlight {
     width: 100%;
     min-height: 120px;
     padding: 10px;
-    padding-right: 90px; /* espacio para el botón */
+    padding-right: 90px;
     font-family: monospace;
     font-size: 14px;
     resize: none;
@@ -346,7 +402,7 @@ mark.highlight {
 .spinner {
     width: 40px;
     height: 40px;
-    border: 5px solid #007bff;
+    border: 5px solid var(--primary-color);
     border-top: 5px solid transparent;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -393,10 +449,10 @@ mark.highlight {
 }
 /* Close button del popup de resumen */
 #summary-popup .close-summary-popup {
-  color: #333;               /* color oscuro para que se vea sobre blanco */
-  background: rgba(0, 0, 0, 0.1);  /* leve fondo semitransparente */
+  color: #333;
+  background: rgba(0, 0, 0, 0.1);
   border: none;
-  border-radius: 50%;        /* círculo */
+  border-radius: 50%;
   width: 32px;
   height: 32px;
   font-size: 1.2rem;
@@ -410,6 +466,11 @@ mark.highlight {
 #summary-popup .close-summary-popup:hover {
   background: rgba(0, 0, 0, 0.2);
 }
+#summary-popup-content h2 {
+  text-align: center;
+  margin: 0 0 10px;
+}
+
 
 .close-summary-popup {
   position: absolute;
@@ -452,8 +513,8 @@ mark.highlight {
 }
 
 .chk-rest:checked {
-  background-color: #007bff; /* Azul principal */
-  border-color: #007bff;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .chk-rest:checked::after {
@@ -501,7 +562,7 @@ mark.highlight {
 .edit-btn:hover,
 .save-btn:hover,
 .cancel-btn:hover {
-    background-color: rgba(0,0,0,0.04);  /* fondo muy ligero */
+    background-color: rgba(0,0,0,0.04);
     border-radius: 4px;
 }
 
@@ -519,7 +580,7 @@ mark.highlight {
 .save-spinner {
   width: 1em;
   height: 1em;
-  border: 2px solid #007bff;
+  border: 2px solid var(--primary-color);
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin-small 0.6s linear infinite;
@@ -573,7 +634,7 @@ mark.highlight {
 /* contenedor de toasts */
 #toast-container {
   position: fixed;
-  top: 1rem;
+  top: 4rem;
   right: 1rem;
   display: flex;
   flex-direction: column;
@@ -608,9 +669,9 @@ mark.highlight {
 
 /* Éxito */
 .toast.success {
-  background-color: #e8f5e9;    /* verde muy suave */
+  background-color: #e8f5e9;
   border-left: 4px solid #4caf50;
-  color: #2e7d32;               /* verde oscuro para texto */
+  color: #2e7d32;
 }
 .toast.success .icon {
   margin-right: 0.75rem;
@@ -620,17 +681,17 @@ mark.highlight {
 
 /* Error */
 .toast.error {
-  background-color: #ffebee;    /* rojo muy suave */
+  background-color: #ffebee;
   border-left: 4px solid #e53935;
-  color: #c62828;               /* rojo oscuro para texto */
+  color: #c62828;
 }
 .toast.error .icon { /* mismos ajustes de icono */ }
 
 /* Advertencia */
 .toast.warning {
-  background-color: #fff8e1;    /* amarillo muy suave */
+  background-color: #fff8e1;
   border-left: 4px solid #f9a825;
-  color: #ef6c00;               /* amarillo oscuro para texto */
+  color: #ef6c00;
 }
 .toast.warning .icon { /* mismos ajustes de icono */ }
 
@@ -644,14 +705,13 @@ mark.highlight {
   transform: translateX(100%);
 }
 
-/* ———————————————————— */
 /* Panel “Restricciones Detectadas” (oculto por defecto) */
 #detected-panel {
-  display: none;               /* se muestra solo tras procesar contexto */
+  display: none;
   width: 95%;
   max-width: 1000px;
-  background-color: #fff3cd;   /* fondo suave amarillo */
-  border: 1px solid #ffeeba;   /* borde acorde */
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
   border-radius: 8px;
   padding: 16px 24px;
   margin: 20px auto;
@@ -659,7 +719,7 @@ mark.highlight {
 }
 #detected-panel h3 {
   margin-top: 0;
-  color: #856404;              /* texto marrón oscuro */
+  color: #856404;
   font-size: 18px;
 }
 #detected-constraints {
@@ -678,14 +738,14 @@ mark.highlight {
   position: fixed;
   top: 0; left: 0;
   width: 250px; height: 100%;
-  background: #ffffff; /* Fondo blanco, al igual que el de otros paneles */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Sombra sutil */
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateX(-100%);
   transition: transform 0.25s ease-in-out;
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  border-radius: 10px; /* Bordes redondeados */
+  border-radius: 10px;
 }
 
 /* Cuando está abierto */
@@ -699,9 +759,9 @@ mark.highlight {
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background-color: #f4f4f4; /* Gris claro para que combine con el resto */
-  border-bottom: 1px solid #eee; /* Borde suave para separarlo del contenido */
-  color: #333; /* Color de texto más oscuro para mejor contraste */
+  background-color: #f4f4f4;
+  border-bottom: 1px solid #eee;
+  color: #333;
 }
 
 
@@ -710,8 +770,8 @@ mark.highlight {
   flex: 1;
   padding: 1rem;
   overflow-y: auto;
-  background-color: #f8fbff; /* Fondo claro similar al de los paneles */
-  border-bottom-left-radius: 10px; /* Bordes redondeados en la parte inferior */
+  background-color: #f8fbff;
+  border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
 }
 
@@ -730,18 +790,18 @@ mark.highlight {
 .project-list li {
   padding: 0.5rem;
   cursor: pointer;
-  border-radius: 8px; /* Bordes redondeados en cada proyecto */
+  border-radius: 8px;
   transition: background-color 0.3s ease;
 }
 
 .project-list li:hover {
-  background-color: #f0f0f0; /* Fondo suave en hover */
+  background-color: #f0f0f0;
 }
 
 #project-list li.active {
-  background-color: #dcdcdc; /* Gris claro pero más visible */
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Sombreado suave */
-  border-radius: 4px; /* Bordes redondeados opcionales */
+  background-color: #dcdcdc;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
 }
 
 /* Footer con botones */
@@ -750,16 +810,16 @@ mark.highlight {
   border-top: 1px solid #eee;
   display: flex;
   gap: 0.5rem;
-  background-color: #ffffff; /* Fondo blanco */
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08); /* Sombra sutil */
+  background-color: #ffffff;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Botón hamburguesa a la izquierda */
 .sidebar-toggle {
-  order: -1;           /* se muestra antes que el <h1> */
-  margin-right: 1rem;  /* separación con el título */
-  margin-left: 0;      /* asegúrate de no tener margen izquierdo */
-  background: none;    /* o tu color de preferencia */
+  order: -1;
+  margin-right: 1rem;
+  margin-left: 0;
+  background: none;
   color: white;
   border: none;
   font-size: 1.25rem;
@@ -772,7 +832,7 @@ mark.highlight {
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
-  color: #007bff; /* Azul similar al de la interfaz */
+  color: var(--primary-color);
 }
 /* Botón “Nuevo proyecto” */
 .new-project-btn {
@@ -780,10 +840,10 @@ mark.highlight {
   width: 100%;
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
-  background: #007bff; /* Mismo azul */
+  background: var(--primary-color);
   color: #fff;
   border: none;
-  border-radius: 8px; /* Bordes redondeados */
+  border-radius: 8px;
   text-align: left;
   cursor: pointer;
   box-shadow: 0 4px 6px rgba(0, 123, 255, 0.3);
@@ -795,32 +855,54 @@ mark.highlight {
   transform: scale(1.05);
 }
 
+.duplicate-btn {
+  background-color: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: 10px;
+  transition: color 0.3s ease;
+  position: absolute;
+  right: 40px; /* 40px del borde derecho para situarlo al lado del delete-btn */
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.duplicate-btn:hover {
+  color: #333;
+}
+
+.duplicate-btn i {
+  pointer-events: none;
+}
+
 
 .delete-btn {
   background-color: transparent;
   border: none;
-  color: #666; /* Gris oscuro para el icono */
+  color: #666;
   cursor: pointer;
-  font-size: 16px; /* Tamaño del icono */
+  font-size: 16px;
   margin-left: 10px;
   transition: color 0.3s ease;
-  position: absolute; /* Alineación absoluta dentro del li */
-  right: 10px; /* Alineado a la derecha */
+  position: absolute;
+  right: 10px;
   top: 50%;
-  transform: translateY(-50%); /* Centra verticalmente */
+  transform: translateY(-50%);
 }
 
 .delete-btn:hover {
-  color: #333; /* Gris más oscuro al pasar el ratón */
+  color: #333;
 }
 
 .delete-btn i {
-  pointer-events: none; /* Evita que el icono tenga interacciones propias */
+  pointer-events: none;
 }
 
 li {
-  position: relative; /* Necesario para que el botón se posicione correctamente */
-  padding-right: 30px; /* Espacio para el botón de borrar */
+  position: relative;
+  padding-right: 60px;
 }
 
 .code-popup {
@@ -856,7 +938,7 @@ li {
 .close-popup {
   background: none;
   border: none;
-  color: #007bff;
+  color: var(--primary-color);
   font-size: 1.2em;
   font-weight: bold;
   float: right;
@@ -869,7 +951,7 @@ li {
 }
 
 .restriccion-item.relaxed-highlight {
-background-color: #fff3cd;      /\* amarillo muy suave \*/
+background-color: #fff3cd;
 border-left:    4px solid #ffc107;
 transition:     background 0.3s;
 }
@@ -882,14 +964,127 @@ background-color: #ffe8a1;
 .relaxed-note {
   margin: 1rem 0;
   padding: 0.75rem 1rem;
-  background-color: #fff3cd;   /* amarillento suave */
-  border: 1px solid #ffeeba;   /* borde crema */
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
   border-radius: 4px;
-  color: #856404;               /* texto marrón oscuro */
+  color: #856404;
   font-size: 0.95rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+#save-controls {
+  position: absolute;        /* fuera del flujo */
+  top: 50%;                  /* verticalmente centrado */
+  right: 1rem;               /* a 1rem del borde derecho */
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  font-size: 0.9rem;
+  z-index: 1100;
+  /* opcional si quieres limitar ancho */
+  max-width: 280px;
+}
+
+#save-status {
+  color: #555;
+  font-weight: 600;
+}
+
+#save-button {
+  position: relative;       /* para el spinner interno */
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: var(--primary-color);
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s, filter 0.2s;
+}
+#save-button:disabled {
+  color: #ccc;
+  cursor: default;
+}
+#save-button:not(:disabled):hover {
+  filter: brightness(0.9);
+  background: rgba(0, 123, 255, 0.1);
+}
+
+
+mark.highlight.clickable {
+  background: #fff3cd;
+  transition: background 0.3s;
+}
+mark.highlight.clickable:hover {
+  background: #ffeeba;
+}
+mark.highlight.clickable.adding {
+  background: #ffeeba;
+  opacity: 0.6;
+}
+mark.highlight.clickable.added {
+  background: #d4edda;
+}
+
+/* Icono de ayuda discreto */
+.info-icon {
+  cursor: help;
+  margin-left: 0.5rem;
+  font-size: 1rem; /* mismo tamaño base que el texto */
+  color: rgba(255, 255, 255, 0.8); /* semitransparente sobre fondo primario */
+  transition: color 0.2s;
+  vertical-align: middle;
+}
+
+.context-panel .info-icon,
+.panel h2 .info-icon {
+  /* Sobre fondos claros de panel usamos primary-color oscuro */
+  color: var(--primary-color);
+}
+.info-icon:hover {
+  color: var(--primary-color); /* acentúa al hacer hover */
+}
+
+.tooltip {
+  position: absolute;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  max-width: 200px;
+  display: none;
+  z-index: 1000;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 12px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: transparent transparent rgba(0,0,0,0.85) transparent;
+}
+
+.info-note {
+  background-color: #d0eaff;      /* Azul un poco más fuerte */
+  color: #1a4d7a;                 /* Texto más oscuro para contraste */
+  border: 2px solid #7fbfea;      /* Borde más grueso y definido */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Sombra suave para elevarlo */
+  padding: 0.6rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  max-width: 100%;
+  text-align: left;
+  margin: 0 0 1rem 0;
 }
 
 
