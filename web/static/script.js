@@ -1172,6 +1172,28 @@ document.addEventListener("DOMContentLoaded", function () {
           const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
           const { resources = {}, variables = {} } = data;
 
+          const maxLen = 500;
+          function truncate(str) {
+            if (str.length <= maxLen) return str;
+            const extra = str.length - maxLen;
+            return str.slice(0, maxLen) + `… [+${extra} caracteres]`;
+          }
+
+          function formatArray(arr) {
+            const n = arr.length;
+            if (n === 0) {
+              return '';  // nada para listas vacías
+            } else if (n <= 5) {
+              // Pocos elementos: mostramos todos
+              return '[' + arr.map(v => JSON.stringify(v)).join(', ') + ']';
+            } else {
+              // Muchos elementos: mostramos solo los dos primeros y el último
+              const firstTwo = arr.slice(0, 2).map(v => JSON.stringify(v)).join(', ');
+              const lastOne  = JSON.stringify(arr[n - 1]);
+              return `[${firstTwo}, ..., ${lastOne}]`;
+            }
+          }
+
           const table = document.createElement('table');
           table.style.width = '100%';
           table.style.borderCollapse = 'collapse';
@@ -1189,12 +1211,22 @@ document.addEventListener("DOMContentLoaded", function () {
           const tbody = document.createElement('tbody');
           [resources, variables].forEach(obj => {
             Object.entries(obj).forEach(([key, vals]) => {
+              let disp;
+              if (Array.isArray(vals)) {
+                // Siempre en formato array truncado
+                disp = formatArray(vals);
+              } else {
+                // Para cualquier otro valor, lo convertimos a string y truncamos si es necesario
+                disp = truncate(String(vals));
+              }
+
+              const cellContent = disp || '';
+
               const tr = document.createElement('tr');
               tr.innerHTML = `
                 <td style="${tdStyle}">${key}</td>
-                <td style="${tdStyle}">${
-                  Array.isArray(vals) ? vals.join(', ') : vals
-                }</td>`;
+                <td style="${tdStyle}">${cellContent}</td>
+              `;
               tbody.appendChild(tr);
             });
           });
@@ -1425,5 +1457,3 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 });
-
-

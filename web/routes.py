@@ -331,11 +331,6 @@ def convert():
         return jsonify({"message": f"Error interno: {e}"}), 500
 
 
-
-
-
-
-
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
     """Activa las restricciones seleccionadas y ejecuta la optimización."""
