@@ -1,6 +1,34 @@
 document.addEventListener("DOMContentLoaded", function () {
+  let contextReady = false;
+  const constraintInput = document.getElementById("constraint");
+  const convertButton   = document.getElementById("convert-button");
+
+  // Al principio: modo sólo lectura y handler de aviso
+  if (constraintInput) {
+    constraintInput.addEventListener("mousedown", e => {
+      if (!contextReady) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showToast("warning", "Primero ingresa un contexto y pulsa “Subir”.");
+      }
+      // si contextReady===true, no hacemos nada y se abre el textarea
+    });
+  }
+
+  if (convertButton) {
+    convertButton.addEventListener("click", e => {
+      if (!contextReady) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showToast("warning", "Primero ingresa un contexto y pulsa “Subir”.");
+      }
+      // si contextReady===true, deja que siga su listener normal
+    });
+  }
+
   let procesandoRestricciones = false;
   let originalText = "";
+
   const okButton = document.getElementById("ok-button");
   const contextInput = document.getElementById("context");
   const wrapper = document.querySelector(".textarea-with-button");
@@ -310,6 +338,13 @@ document.addEventListener("DOMContentLoaded", function () {
           sessionStorage.setItem('currentProjectName', proj.name);
           contextInput.innerText = proj.context || "";
           originalText = contextInput.innerText;
+          // ─── Si al cargar ya hay contexto, desbloqueamos directamente ───
+          if (proj.context && proj.context.trim().length > 0) {
+            contextReady = true;
+          } else {
+            contextReady = false;
+          }
+
 
           sessionStorage.setItem('savedContext', contextInput.innerText);
           renderContextControls();
@@ -535,7 +570,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // 1) Guardar variables
           sessionStorage.setItem("variables", JSON.stringify(p.result));
-
+          contextReady = true;
+          if (constraintInput) constraintInput.readOnly = false;
 
           // Resaltar restricciones detectadas inline en el contexto
           if (p.result.detected_constraints && p.result.detected_constraints.length) {
@@ -630,9 +666,6 @@ document.addEventListener("DOMContentLoaded", function () {
           originalText = ctx;
           contextInput.setAttribute('contenteditable', 'false');
           sessionStorage.setItem('savedContext', contextInput.innerText);
-          // 4) Mostramos el panel de restricciones manuales
-          const restrSection = document.querySelector(".container");
-          if (restrSection) restrSection.style.display = "flex";
 
           showToast("success", "Contexto procesado correctamente.");
 
@@ -993,7 +1026,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    const convertButton = document.getElementById("convert-button");
     if (convertButton) {
       convertButton.addEventListener("click", async () => {
         const inp = document.getElementById("constraint");
@@ -1097,11 +1129,12 @@ document.addEventListener("DOMContentLoaded", function () {
         btnEdit.addEventListener('click', () => {
           let prevNote = document.getElementById('relaxed-note');
           if (prevNote) prevNote.remove();
+          contextInput.innerText    = originalText;
+          contextInput.disabled     = true;
           contextInput.setAttribute('contenteditable', 'true');
           contextInput.focus();
 
-          contextInput.disabled = false;
-          contextInput.focus();
+
           btnContainer.innerHTML = '';
 
           const btnSave = document.createElement('button');
@@ -1118,8 +1151,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // Cancelar edición
           btnCancel.addEventListener('click', () => {
-            contextInput.innerText    = originalText;
-            contextInput.disabled     = true;
+            contextInput.innerHTML     = originalText;
+            contextInput.setAttribute('contenteditable', 'false')
             renderContextControls();
           });
 
@@ -1282,7 +1315,14 @@ document.addEventListener("DOMContentLoaded", function () {
       if (savedCtx !== null && contextInput) {
         contextInput.innerText = savedCtx;
         contextInput.setAttribute('contenteditable', 'false');
+        originalText = savedCtx;
         renderContextControls();
+      }
+
+      if (savedCtx && savedCtx.trim().length > 0) {
+        contextReady = true;
+      } else {
+        contextReady = false;
       }
 
       // 1) Reaplicar highlight de restricciones relajadas

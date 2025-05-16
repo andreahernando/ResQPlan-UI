@@ -1049,7 +1049,7 @@ mark.highlight.clickable.added {
   color: var(--primary-color);
 }
 .info-icon:hover {
-  color: var(--primary-color); /* acentúa al hacer hover */
+  color: var(--primary-color);
 }
 
 .tooltip {
@@ -1075,10 +1075,10 @@ mark.highlight.clickable.added {
 }
 
 .info-note {
-  background-color: #d0eaff;      /* Azul un poco más fuerte */
-  color: #1a4d7a;                 /* Texto más oscuro para contraste */
-  border: 2px solid #7fbfea;      /* Borde más grueso y definido */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Sombra suave para elevarlo */
+  background-color: #d0eaff;
+  color: #1a4d7a;
+  border: 2px solid #7fbfea;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   padding: 0.6rem 1rem;
   border-radius: 0.5rem;
   font-size: 0.9rem;
