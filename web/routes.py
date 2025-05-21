@@ -33,6 +33,12 @@ def create_project():
         specs = {
             "decision_variables": [],
         }
+    if 'objective_description' in specs:
+        # ya está ahí, nada que hacer
+        pass
+    elif 'objective' in specs:
+        # podrías inicializar a vacío o con un texto genérico
+        specs['objective_description'] = ""
     manual = session.get('restricciones', [])
 
     # Tomamos el shift_store si existe, sino lista vacía
@@ -172,24 +178,29 @@ def translate():
         # como cualquier otro ValueError o JSONDecodeError
         return jsonify({"message": str(e)}), 400
 
-
+    # ——————————————————————————————
+    # 1) Guardamos specs (incluyendo objective y descripción) en sesión
     session['variables'] = variables
     if 'objective' in variables:
         session['variables']['objective'] = variables['objective']
+    if 'objective_description' in variables:
+        session['variables']['objective_description'] = variables['objective_description']
 
-    # Persistimos en Mongo las specs completas y las restricciones detectadas
+    # 2) Persistimos inmediatamente en MongoDB
     pid = session.get('current_project_id')
     if pid:
         current_app.mongo.db.projects.update_one(
             {"id": pid},
             {"$set": {
-                "variables": variables,
-                "detectedConstraints": variables.get("detected_constraints", [])
+               "variables": variables,
+               "detectedConstraints": variables.get("detected_constraints", []),
+               "objective_description": variables.get("objective_description", "")
             }}
         )
 
-    # (Re)creamos el optimizador en memoria
+    # 3) (Re)creamos el optimizador en memoria
     current_app.shift_store = ShiftOptimizer(variables)
+
     return jsonify({"result": variables}), 200
 
 

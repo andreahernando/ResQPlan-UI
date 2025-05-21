@@ -1170,8 +1170,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // Callback para “Ver resumen”
         btnSummary.addEventListener('click', () => {
           const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
-          const { resources = {}, variables = {} } = data;
-          const objective = data.objective || data.objectivo || null;
+          const { resources = {}, variables = {}, objective_description, objective: objectiveCode } = data;
+          const objective = objective_description || objectiveCode || null;
+
 
           const maxLen = 500;
           function truncate(str) {

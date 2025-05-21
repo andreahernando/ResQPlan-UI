@@ -74,6 +74,8 @@ def extract_variables_from_context(context: str) -> dict:
         "      \"             for a in variables['lista_asignaturas']\\n\"\n"
         "      \"             for d in range(variables['dias'])\\n\"\n"
         "      \"             for f in range(variables['franjas'])), GRB.MINIMIZE)\"\n\n"
+        "Además, añade una clave **\"objective_description\"**: una cadena en lenguaje natural\n"
+        "que explique brevemente qué hace esa función objetivo (qué minimiza o maximiza y por qué).\n\n"
 
         "En el caso que detectes alguna restricción en el contexto (Oraciones meramente descriptivas (horarios, cantidades, desplazamientos) no se incluirán), añade la siguiente clave (SOLO EN EL CASO QUE LO DETECTES):\n"
         "5) \"detected_constraints\" ⇒ lista de cadenas, **sin** convertirlas en código, que contenga todas las oraciones del texto de entrada que parezcan restricciones en lenguaje natural.\n\n"
@@ -103,6 +105,9 @@ def extract_variables_from_context(context: str) -> dict:
         # Validar que venga la clave "objective"
         if "objective" not in data:
             return {"error": "El JSON de salida no incluye la clave 'objective'."}
+
+        if "objective_description" not in data:
+            data["objective_description"] = ""
 
         # Validaciones básicas
         if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):
