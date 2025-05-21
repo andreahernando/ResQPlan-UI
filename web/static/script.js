@@ -1171,6 +1171,7 @@ document.addEventListener("DOMContentLoaded", function () {
         btnSummary.addEventListener('click', () => {
           const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
           const { resources = {}, variables = {} } = data;
+          const objective = data.objective || data.objectivo || null;
 
           const maxLen = 500;
           function truncate(str) {
@@ -1209,6 +1210,15 @@ document.addEventListener("DOMContentLoaded", function () {
           table.appendChild(thead);
 
           const tbody = document.createElement('tbody');
+          // 1) Si existe objective, añádelo como primera fila
+            if (objective) {
+              const trObj = document.createElement('tr');
+              trObj.innerHTML = `
+                <td style="${tdStyle}"><strong>Objetivo</strong></td>
+                <td style="${tdStyle}">${truncate(String(objective))}</td>
+              `;
+              tbody.appendChild(trObj);
+            }
           [resources, variables].forEach(obj => {
             Object.entries(obj).forEach(([key, vals]) => {
               let disp;
