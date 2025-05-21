@@ -11,17 +11,27 @@ if (!raw) {
   // 2) Procesar la solución en un objeto 'resumen'
   const resumen = {};
   const trabajadores = new Set();
+
   for (const [key, value] of Object.entries(data.solution)) {
     if (value > 0.5) {
       const parsed = parseKey(key);
       if (!parsed) continue;
-      const { entidad, dia, franja } = parsed;
-      trabajadores.add(entidad);
-      resumen[franja] = resumen[franja] || {};
-      resumen[franja][dia] = resumen[franja][dia] || [];
-      resumen[franja][dia].push(entidad);
+
+      const { entidades, dia, franja } = parsed;
+
+      // 1) Añado **todas** las entidades (curso, asignatura, profesor…) al filtro
+      entidades.forEach(e => trabajadores.add(e));
+
+      // 2) Inicializo si hace falta
+      resumen[franja]          = resumen[franja] || {};
+      resumen[franja][dia]     = resumen[franja][dia]  || [];
+
+      // 3) Guardo el grupo completo unido por " / "
+      resumen[franja][dia].push(entidades.join(" / "));
     }
   }
+
+
 
   // 3) Calcular dimensiones
   const turnos = Math.max(...Object.keys(resumen).map(Number), 0) + 1;
@@ -147,13 +157,39 @@ if (!raw) {
   });
 }
 
-// --- Función auxiliar para parsear la clave ---
 function parseKey(key) {
-  const regex = /\(\s*['"]?([^,'"]+)['"]?\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/;
-  const m = key.match(regex);
-  if (!m) return null;
-  return { entidad: m[1], dia: +m[2], franja: +m[3] };
+  let entidades = [], dia, franja;
 
+  // Caso A: tupla con paréntesis
+  if (key.startsWith("(")) {
+    // Captura todo antes de los dos últimos números
+    const regex = /^\(\s*(.+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/;
+    const m = key.match(regex);
+    if (!m) return null;
+
+    // m[1] = "'1ºA','Matemáticas','Juan Pérez'"
+    entidades = m[1]
+      .split(/\s*,\s*/)
+      .map(s => s.replace(/^['"]|['"]$/g, ""));
+
+    dia    = Number(m[2]);
+    franja = Number(m[3]);
+
+  // Caso B: prefijo “x_” o sin paréntesis, partes separadas por “_”
+  } else {
+    // si viene con “x_” al principio, quítalo
+    const body = key.startsWith("x_") ? key.slice(2) : key;
+    const parts = body.split("_");
+
+    // los dos últimos trozos deben ser números
+    franja = Number(parts.pop());
+    dia    = Number(parts.pop());
+    if (isNaN(dia) || isNaN(franja)) return null;
+
+    entidades = parts;
+  }
+
+  return { entidades, dia, franja };
 }
 
 
