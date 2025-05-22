@@ -33,12 +33,6 @@ def create_project():
         specs = {
             "decision_variables": [],
         }
-    if 'objective_description' in specs:
-        # ya está ahí, nada que hacer
-        pass
-    elif 'objective' in specs:
-        # podrías inicializar a vacío o con un texto genérico
-        specs['objective_description'] = ""
     manual = session.get('restricciones', [])
 
     # Tomamos el shift_store si existe, sino lista vacía
@@ -178,30 +172,18 @@ def translate():
         # como cualquier otro ValueError o JSONDecodeError
         return jsonify({"message": str(e)}), 400
 
-    # ——————————————————————————————
-    # 1) Guardamos specs (incluyendo objective y descripción) en sesión
+    # Si todo fue bien…
     session['variables'] = variables
-    if 'objective' in variables:
-        session['variables']['objective'] = variables['objective']
-    if 'objective_description' in variables:
-        session['variables']['objective_description'] = variables['objective_description']
-
-    # 2) Persistimos inmediatamente en MongoDB
+    detected = variables.get('detected_constraints', [])
     pid = session.get('current_project_id')
     if pid:
         current_app.mongo.db.projects.update_one(
             {"id": pid},
-            {"$set": {
-               "variables": variables,
-               "detectedConstraints": variables.get("detected_constraints", []),
-               "objective_description": variables.get("objective_description", "")
-            }}
+            {"$set": {"manualConstraints": detected}}
         )
-
-    # 3) (Re)creamos el optimizador en memoria
     current_app.shift_store = ShiftOptimizer(variables)
-
     return jsonify({"result": variables}), 200
+
 
 
 @routes.route("/api/edit_constraint", methods=["POST"])
@@ -371,11 +353,6 @@ def optimize():
 
     # Ejecutar la optimización
     optimization_info = optimizer.optimizar() or {}
-    # tras `optimization_info = optimizer.optimizar() or {}`
-    status = optimizer.model.status
-    obj = None
-    if status in (gp.GRB.OPTIMAL, gp.GRB.SUBOPTIMAL):
-        obj = optimizer.model.getAttr("ObjVal")
 
     # Construir la solución
     if optimizer.model.status == gp.GRB.OPTIMAL:
@@ -390,27 +367,13 @@ def optimize():
     # Exportar resultados a Excel
     variables = session.get('variables', {})
     exportar_resultados(optimizer.model, optimizer.decision_vars, variables)
-    pid = session.get('current_project_id')
-    if pid:
-        current_app.mongo.db.projects.update_one(
-            {"id": pid},
-            {"$set": {
-                "gurobiState": {
-                    "status": status,
-                    "objective": obj,
-                    "numVars": optimizer.model.NumVars,
-                    "numConstrs": len(optimizer.model.getConstrs()),
-                    "sense": optimizer.model.Sense
-                }
-            }}
-        )
 
     return jsonify({
         "solution": solution,
-        "status": status,
-        "objective": obj,
+        "status": optimizer.model.status,
         "relaxed_constraints": optimization_info.get("relaxed_constraints", [])
     })
+
 
 
 @routes.route('/api/download_excel')

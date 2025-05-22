@@ -29,13 +29,13 @@ def extract_variables_from_context(context: str) -> dict:
 
     prompt = (
         "Eres un ingeniero experto en modelos de programación lineal con Gurobi.\n"
-        "Recibirás un texto que describe un problema de planificación de turnos o asignaciones "
+        "Recibirás un texto que describe un problema de planificación de turnos o asignaciones"
         "(colegio, hospital, emergencias, etc.). El texto incluye:\n"
         " • Horizonte temporal (número de días, número de franjas y horarios).\n"
         " • Listas de entidades a asignar (retenes, profesores, médicos, ambulancias, cursos, asignaturas, etc.).\n"
         " • Cantidades de recursos disponibles.\n\n"
 
-        "Debes construir un ÚNICO objeto JSON con CUATRO claves obligatorias:\n"
+        "Debes construir un ÚNICO objeto JSON con TRES claves obligatorias:\n" 
         "1) \"variables\"  ⇒ diccionario que contenga SIEMPRE:\n"
         "      - \"dias\"      : <int>,\n"
         "      - \"franjas\"   : <int>,\n"
@@ -44,46 +44,32 @@ def extract_variables_from_context(context: str) -> dict:
         "      'lista_<entidad_plural>' (p. ej. 'lista_retenes', 'lista_medicos', 'lista_cursos', 'lista_asignaturas').\n"
         "2) \"resources\"  ⇒ diccionario con la cantidad disponible de cada recurso "
         "(p. ej. {\"ambulancias\": 3, \"medicos\": 5, \"conductores\": 6}).\n"
-        "3) \"decision_variables\"  ⇒ bloque de código Python **válido**, con una instrucción self.x_<nombre> por cada tipo de asignación detectada.\n"
-        "   Para asignaciones individuales (entidades sin relación), declara una variable así:\n"
-        "      self.x_recurso = { (r, d, f): model.addVar(vtype=GRB.BINARY, name=f\"x_{r}_{d}_{f}\")\n"
-        "                         for r in variables['lista_recurso']\n"
-        "                         for d in range(variables['dias'])\n"
-        "                         for f in range(variables['franjas']) }\n"
-        "   Para asignaciones que involucren tres entidades (por ejemplo, profesor, curso y asignatura), hazlo así:\n"
-        "      self.x_profesor_curso_asignatura = {\n"
-        "          (p, c, a, d, f): model.addVar(vtype=GRB.BINARY, name=f\"x_{p}_{c}_{a}_{d}_{f}\")\n"
-        "          for p in variables['lista_profesores']\n"
-        "          for c in variables['lista_cursos']\n"
-        "          for a in variables['lista_asignaturas']\n"
-        "          for d in range(variables['dias'])\n"
-        "          for f in range(variables['franjas'])\n"
-        "      }\n"
+        "3) \"decision_variables\"  ⇒ bloque de código Python **válido**, con una instrucción self.x_<nombre> por cada tipo de asignación detectada."
+        " Para asignaciones individuales (enti es decir, entidades sin relación), declara una variable así:\n"
+        "      self.x_recurso = { (r, d, f): model.addVar(vtype=GRB.BINARY, name=f\"x_{r}_{d}_{f}\")"
+        "                            for r in variables['lista_recurso']"
+        "                            for d in range(variables['dias'])"
+        "                            for f in range(variables['franjas']) }\n"
+        "Para asignaciones que involucren tres entidades (por ejemplo, profesor, curso y asignatura), hazlo así:\n"
+        "    self.x_profesor_curso_asignatura = {\n"
+        "        (p, c, a, d, f): model.addVar(vtype=GRB.BINARY, name=f\"x_{p}_{c}_{a}_{d}_{f}\")\n"
+        "        for p in variables['lista_profesores']\n"
+        "        for c in variables['lista_cursos']\n"
+        "        for a in variables['lista_asignaturas']\n"
+        "        for d in range(variables['dias'])\n"
+        "        for f in range(variables['franjas'])\n"
+        "    }"
         "   • No utilices bucles 'for:' sueltos fuera de la comprensión.\n"
         "   • Usa directamente 'model.addVar' y 'GRB.BINARY' (no 'self.model.GRB').\n"
         "   • El resultado de la comprensión debe ser un gurobipy.tupledict.\n"
         "   • Asegúrate de escribir saltos de línea REALES, no '\\n' escapados.\n\n"
-
-        "4) \"objective\" ⇒ bloque de código Python **válido** que defina tu función objetivo\n"
-        "   usando model.setObjective(...). Debe referirse a las variables de decisión\n"
-        "   creadas en \"decision_variables\". Por ejemplo:\n"
-        "      \"model.setObjective(\\n\"\n"
-        "      \"    quicksum(8 * x_profesor_curso_asignatura[(p,c,a,d,f)]\\n\"\n"
-        "      \"             for p in variables['lista_profesores']\\n\"\n"
-        "      \"             for c in variables['lista_cursos']\\n\"\n"
-        "      \"             for a in variables['lista_asignaturas']\\n\"\n"
-        "      \"             for d in range(variables['dias'])\\n\"\n"
-        "      \"             for f in range(variables['franjas'])), GRB.MINIMIZE)\"\n\n"
-        "Además, añade una clave **\"objective_description\"**: una cadena en lenguaje natural\n"
-        "que explique brevemente qué hace esa función objetivo (qué minimiza o maximiza y por qué).\n\n"
-
-        "En el caso que detectes alguna restricción en el contexto (Oraciones meramente descriptivas (horarios, cantidades, desplazamientos) no se incluirán), añade la siguiente clave (SOLO EN EL CASO QUE LO DETECTES):\n"
-        "5) \"detected_constraints\" ⇒ lista de cadenas, **sin** convertirlas en código, que contenga todas las oraciones del texto de entrada que parezcan restricciones en lenguaje natural.\n\n"
-
-        "⚠️ IMPORTANTE: Si no se detecta ninguna restricción válida, devuelve 'detected_constraints': [] o no incluyas esa clave.\n"
+        "En el caso que detectes alguna restricción en el contexto (Oraciones meramente descriptivas (horarios, cantidades, desplazamientos) no se incluirán.),añade la siguiente clave (SOLO EN EL CASO QUE LO DETECTES):"
+       "4) \"detected_constraints\"  ⇒ lista de cadenas, **sin** convertirlas en código, " 
+        "   que contenga todas las oraciones del texto de entrada que parezcan "
+        "   restricciones en lenguaje natural.\n\n"
+        "Si no se detecta ninguna restricción válida, devuelve 'detected_constraints': []` o no incluyas esa clave."
         "⚠️ IMPORTANTE: Si el texto no describe un problema de turnos, responde únicamente con:\n"
         "{ \"error\": \"El texto no describe un problema de turnos válido.\" }\n\n"
-
         "Devuelve **solo** ese JSON, sin comentarios ni Markdown.\n\n"
         f"=== TEXTO DE ENTRADA ===\n{context}\n======================="
     )
@@ -102,12 +88,6 @@ def extract_variables_from_context(context: str) -> dict:
         # Inicializar lista de restricciones detectadas si no viene
         if 'detected_constraints' not in data:
             data['detected_constraints'] = []
-        # Validar que venga la clave "objective"
-        if "objective" not in data:
-            return {"error": "El JSON de salida no incluye la clave 'objective'."}
-
-        if "objective_description" not in data:
-            data["objective_description"] = ""
 
         # Validaciones básicas
         if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):

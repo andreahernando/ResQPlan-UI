@@ -62,6 +62,16 @@ document.addEventListener("DOMContentLoaded", function () {
   const cancelCreateBtn = document.getElementById("cancel-create");
   const projectList = document.getElementById("project-list");
 
+  const newProjectBtn   = document.getElementById("new-project-btn");
+
+  newProjectBtn.addEventListener("click", () => {
+    // Mostrar el prompt como flex (recuerda tu CSS usa display:flex)
+    newPrompt.style.display = "flex";
+    // Limpiar valor previo
+    newNameInput.value = "";
+    // Enfocar el input para que aparezca el cursor
+    newNameInput.focus();
+  });
   const contextWarning = document.getElementById('context-warning');
 
 
@@ -83,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll('.info-icon').forEach(icon => {
     // Texto de ayuda según ID
     const helpText = {
-      'info-context': 'Aquí debes escribir el contexto de negocio: información general y datos relevantes para la optimización.',
+      'info-context': 'Aquí debes escribir el contexto: información general y datos relevantes para la optimización.',
       'info-constraints': 'Aquí introduces las restricciones en lenguaje natural, una por línea, que tu modelo debe cumplir.'
     }[icon.id];
 
@@ -109,29 +119,87 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function setupEditProjectName() {
     const editBtn = document.getElementById("edit-project-name");
-    if (!editBtn) return;
-    editBtn.onclick = async () => {
-      const newName = prompt("Nuevo nombre para el proyecto:", currentProjectName);
-      if (!newName || newName.trim() === "" || newName === currentProjectName) return;
-      try {
-        await fetch(`/api/projects/${currentProjectId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newName.trim() })
-        });
-        // Actualizar UI
-        currentProjectName = newName.trim();
-        document.getElementById("project-title").textContent = currentProjectName;
-        document.querySelectorAll("#project-list li").forEach(li => {
-          if (li.dataset.id == currentProjectId) li.firstChild.textContent = currentProjectName;
-        });
-        showToast("success", `Proyecto renombrado a “${currentProjectName}”`);
-      } catch (err) {
-        console.error(err);
-        showToast("error", "No se pudo renombrar el proyecto.");
-      }
+    const titleSpan = document.getElementById("project-title");
+
+    if (!editBtn || !titleSpan) return;
+
+    editBtn.onclick = () => {
+      // Ocultar elementos actuales
+      editBtn.style.display = "none";
+      titleSpan.style.display = "none";
+
+      // Crear elementos de edición
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = currentProjectName;
+      input.id = "project-name-input";         // <-- coincide con el CSS
+      // no hace falta inline styles de background
+
+      const saveBtn = document.createElement("button");
+      saveBtn.id = "save-project-inline";       // <-- coincide con el CSS
+      saveBtn.innerText = "💾";
+      saveBtn.title = "Guardar nombre";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.id = "cancel-project-inline";   // <-- coincide con el CSS
+      cancelBtn.innerText = "✖️";
+      cancelBtn.title = "Cancelar";
+
+      // Insertar en el DOM justo después del título
+      titleSpan.parentNode.insertBefore(input, editBtn);
+      input.after(saveBtn, cancelBtn);
+
+      input.focus();
+      input.select();
+
+      cancelBtn.onclick = () => {
+        // Restaurar UI
+        input.remove();
+        saveBtn.remove();
+        cancelBtn.remove();
+        titleSpan.style.display = "";
+        editBtn.style.display = "";
+      };
+
+      saveBtn.onclick = async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === currentProjectName) {
+          cancelBtn.click();
+          return;
+        }
+
+        try {
+          await fetch(`/api/projects/${currentProjectId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName })
+          });
+          currentProjectName = newName;
+          sessionStorage.setItem('currentProjectName', newName);
+          titleSpan.textContent = currentProjectName;
+
+          // Actualizar el nombre en la lista de proyectos
+          document.querySelectorAll("#project-list li").forEach(li => {
+            if (li.dataset.id == currentProjectId) {
+              li.firstChild.textContent = currentProjectName;
+            }
+          });
+
+          showToast("success", `Proyecto renombrado a “${currentProjectName}”`);
+        } catch (err) {
+          console.error(err);
+          showToast("error", "No se pudo renombrar el proyecto.");
+        } finally {
+          input.remove();
+          saveBtn.remove();
+          cancelBtn.remove();
+          titleSpan.style.display = "";
+          editBtn.style.display = "";
+        }
+      };
     };
   }
+
 
 
 
@@ -222,7 +290,14 @@ document.addEventListener("DOMContentLoaded", function () {
     } else {
       headerDiv.style.display = "none";
     }
-    document.getElementById("save-controls").style.display = "none";
+
+    const saveControls = document.getElementById("save-controls");
+    if (currentProjectId) {
+      saveControls.style.display = "flex";
+    } else {
+      saveControls.style.display = "none";
+    }
+
     let prevNote = document.getElementById('relaxed-note');
     if (prevNote) prevNote.remove();
 
@@ -440,6 +515,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const name = newNameInput.value.trim();
     if (!name) return showToast("warning", "Ponle un nombre al proyecto");
     const proj = await createProject(name);
+
+    contextReady = false;
+    if (constraintInput) {
+      constraintInput.readOnly = true;
+      constraintInput.value = "";
+    }
+    renderContextControls();
+
+
     currentProjectId = proj.id;
     currentProjectName = proj.name;
     newPrompt.style.display = "none";
@@ -821,6 +905,7 @@ document.addEventListener("DOMContentLoaded", function () {
               inputEdit.replaceWith(label);
               inlineControls.replaceWith(controlsWrapper);
               guardarRestricciones();
+              markDirty();
               showToast("success", "Restricción editada correctamente.");
             } else {
               throw new Error(result.error || "Server error");
@@ -854,6 +939,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (res.ok && result.success) {
           // 1) Elimino el <li> de la restricción
           li.remove();
+          markDirty()
           guardarRestricciones();
           updateManualConstraintsInfo()
           showToast("success", "Restricción eliminada correctamente.");
@@ -1006,6 +1092,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         guardarRestricciones();
         updateManualConstraintsInfo()
+        markDirty();
         showToast("success", "Restricción añadida correctamente.");
 
       } catch (err) {
@@ -1170,9 +1257,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Callback para “Ver resumen”
         btnSummary.addEventListener('click', () => {
           const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
-          const { resources = {}, variables = {}, objective_description, objective: objectiveCode } = data;
-          const objective = objective_description || objectiveCode || null;
-
+          const { resources = {}, variables = {} } = data;
 
           const maxLen = 500;
           function truncate(str) {
@@ -1211,15 +1296,6 @@ document.addEventListener("DOMContentLoaded", function () {
           table.appendChild(thead);
 
           const tbody = document.createElement('tbody');
-          // 1) Si existe objective, añádelo como primera fila
-            if (objective) {
-              const trObj = document.createElement('tr');
-              trObj.innerHTML = `
-                <td style="${tdStyle}"><strong>Objetivo</strong></td>
-                <td style="${tdStyle}">${truncate(String(objective))}</td>
-              `;
-              tbody.appendChild(trObj);
-            }
           [resources, variables].forEach(obj => {
             Object.entries(obj).forEach(([key, vals]) => {
               let disp;
@@ -1403,42 +1479,62 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
-    // ——— Estado de guardado ———
+    // ——— Estado de guardado y funciones globales ———
     let isSaved = true;
-    const saveStatus  = document.getElementById("save-status");
-    const saveButton  = document.getElementById("save-button");
 
-    // Actualiza texto y estado del botón
+    const saveStatusElem = document.getElementById("save-status");
+    let saveButtonElem  = document.getElementById("save-button");
+
+    // 1) Actualiza la UI del estado de guardado
+    function updateSaveUI() {
+      if (!saveStatusElem || !saveButtonElem) return;
+      if (isSaved) {
+        saveStatusElem.textContent = "Todo guardado ✔️";
+        saveButtonElem.disabled    = true;
+      } else {
+        saveStatusElem.textContent = "Cambios sin guardar ⚠️";
+        saveButtonElem.disabled    = false;
+      }
+    }
+
+    // 2) Marca que hay cambios pendientes
+    function markDirty() {
+      if (isSaved) {
+        isSaved = false;
+        updateSaveUI();
+      }
+    }
+
+    // ——— Configuración de handlers de guardado ———
     function setupSaveHandlers() {
-      const saveStatus = document.getElementById("save-status");
-      const saveButton = document.getElementById("save-button");
+      const contextInput = document.getElementById("context");
+      const restrList    = document.querySelector(".restricciones-list");
 
-      function updateSaveUI() {
-        if (isSaved) {
-          saveStatus.textContent = "Todo guardado ✔️";
-          saveButton.disabled = true;
-        } else {
-          saveStatus.textContent = "Cambios sin guardar ⚠️";
-          saveButton.disabled = false;
-        }
+      // Comprueba que exista el botón y el status (puede cambiar tras un refresh)
+      saveButtonElem   = document.getElementById("save-button");
+      if (!saveStatusElem || !saveButtonElem) {
+        console.warn("No encontré #save-status o #save-button");
+        return;
       }
 
-      function markDirty() {
-        if (isSaved) {
-          isSaved = false;
-          updateSaveUI();
-        }
+      // 3) Asociar eventos que marcan el estado “sucio”
+      if (contextInput) {
+        contextInput.addEventListener("input", markDirty);
+      }
+      if (restrList) {
+        restrList.addEventListener("change", markDirty);
+        restrList.addEventListener("click", markDirty);
       }
 
-      // Asociar eventos que marcan el estado sucio
-      contextInput.addEventListener("input", markDirty);
-      document.querySelector(".restricciones-list").addEventListener("change", markDirty);
-      document.querySelector(".restricciones-list").addEventListener("click", markDirty);
+      // 4) Evitar múltiples bindings: clona y reemplaza el botón
+      const newSaveBtn = saveButtonElem.cloneNode(true);
+      saveButtonElem.parentNode.replaceChild(newSaveBtn, saveButtonElem);
+      saveButtonElem = newSaveBtn;
 
-      // Listener para guardar manualmente
-      saveButton.addEventListener("click", async () => {
-        saveStatus.textContent = "Guardando…";
-        saveButton.disabled = true;
+      // 5) Listener para el botón “Guardar”
+      saveButtonElem.addEventListener("click", async () => {
+        saveStatusElem.textContent = "Guardando…";
+        saveButtonElem.disabled    = true;
         try {
           await autoSaveProject();
           isSaved = true;
@@ -1446,15 +1542,17 @@ document.addEventListener("DOMContentLoaded", function () {
           showToast("success", "Todos los cambios se han guardado.");
         } catch (err) {
           console.error(err);
-          saveStatus.textContent = "Error al guardar ❌";
-          saveButton.disabled = false;
+          saveStatusElem.textContent = "Error al guardar ❌";
+          saveButtonElem.disabled    = false;
           showToast("error", "No se pudo guardar manualmente.");
         }
       });
 
-      // Inicializar el estado
+      // 6) Inicializa la UI según el estado actual
       updateSaveUI();
     }
+
+
     function updateManualConstraintsInfo() {
       const info = document.getElementById('no-constraints-info');
       const lista = document.querySelector('.restricciones-list');

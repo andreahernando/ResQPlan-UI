@@ -10,9 +10,7 @@ class ShiftOptimizer:
         self.specs = specs
         # guardo el bloque raw para re-ejecutar variables
         self._dv_code_str = specs["decision_variables"]
-        self._obj_code_str = specs.get("objective", "")
         self._compile_dv_code()
-        self._compile_obj_code()
         # mapas de restricciones
         self.constraint_descriptions = {}
         self.restricciones_validadas = {}  # nl -> {"code":…, "activa":bool}
@@ -33,21 +31,6 @@ class ShiftOptimizer:
         )
         code = code.replace("model.GRB.", "GRB.").replace("self.GRB.", "GRB.")
         self._dv_code_compiled = compile(code, "<decision_variables>", "exec")
-
-    def _compile_obj_code(self):
-        """Compila el bloque objective que venga en specs."""
-        if not self._obj_code_str:
-            self._obj_code_compiled = None
-            return
-        code = (
-            self._obj_code_str
-            .replace("\\n", "\n")
-            .replace("self.model", "model")
-            .replace("self.", "")
-        )
-        # ya no usamos fences ni self., y lo compilamos
-        self._obj_code_compiled = compile(code, "<objective>", "exec")
-
 
     def _build_base_exec_context(self):
         self.exec_context = {
@@ -139,8 +122,6 @@ class ShiftOptimizer:
                 if c.constrName not in prev:
                     self.name_to_nl[c.constrName] = nl
                     self.constraint_descriptions[c.constrName] = nl
-        if getattr(self, "_obj_code_compiled", None):
-            exec(self._obj_code_compiled, self.exec_context)
 
 
 

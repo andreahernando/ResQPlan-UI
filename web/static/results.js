@@ -120,11 +120,22 @@ if (!raw) {
     for (let t = 0; t < turnos; t++) {
       html += `<tr><td><strong>Turno ${t}</strong></td>`;
       for (let d = 0; d < dias; d++) {
-        const entidades = resumen[t]?.[d] || [];
-        const visibles = filtro === 'Todos'
-          ? entidades
-          : entidades.filter(e => e === filtro);
-        const texto = visibles.length ? visibles.join(' / ') : 'Descanso';
+        // resumen[t][d] es un array de strings como "1ºA / Matemáticas / Juan Pérez"
+        const grupos = resumen[t]?.[d] || [];
+
+        // Filtramos cada grupo descomponiéndolo en entidades
+        const visibles = grupos.filter(grupo => {
+          if (filtro === 'Todos') return true;
+          const partes = grupo.split(' / ');
+          return partes.some(entidad => entidad === filtro);
+        });
+
+        // Si hay al menos un grupo visible, los mostramos (unidos por coma),
+        // si no, marcamos descanso
+        const texto = visibles.length
+          ? visibles.join(', ')
+          : 'Descanso';
+
         const clase = visibles.length ? 'active-cell' : 'rest-cell';
         html += `<td class="${clase}">${texto}</td>`;
       }
