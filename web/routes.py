@@ -269,17 +269,14 @@ def convert():
     data = request.get_json() or {}
     nl = (data.get('constraint') or "").strip()
 
-    # 1) Validación de entrada
     if not nl:
         return jsonify({"message": "No se especificó ninguna restricción."}), 400
 
-    # 2) Comprobar que hay variables en sesión
     translate_vars = session.get('variables')
     if not translate_vars:
         return jsonify({"message": "No hay variables en sesión. Sube un contexto primero."}), 400
 
     try:
-        # 3) Traducción a código Gurobi
         result = translate_constraint_to_code(nl, translate_vars)
         if isinstance(result, dict) and result.get("error"):
             return jsonify({"message": result["error"]}), 400
@@ -287,25 +284,19 @@ def convert():
 
         valid = False
         if hasattr(current_app, 'shift_store'):
-            # 4) Validar en memoria (esto llenará ShiftOptimizer.name_to_nl)
             valid = current_app.shift_store.validar_restriccion(nl, code)
-            # 4.1) Inyectar en el modelo real para que name_to_nl se consolide
             if valid:
                 current_app.shift_store.agregar_restriccion(nl)
 
-            # 5) Persistir estado en MongoDB
             pid = session.get('current_project_id')
             if pid:
-                # 5a) validatedConstraints
                 vc_list = [
                     {"texto": t, "code": info["code"], "activa": info["activa"]}
                     for t, info in current_app.shift_store.restricciones_validadas.items()
                 ]
-                # 5b) manualConstraints (añadir si es nuevo)
                 manual = session.get('restricciones', [])
                 if not any(m['texto'] == nl for m in manual):
                     manual.append({"texto": nl, "activa": True})
-                # actualización conjunta
                 current_app.mongo.db.projects.update_one(
                     {"id": pid},
                     {"$set": {
@@ -313,14 +304,12 @@ def convert():
                         "manualConstraints": manual
                     }}
                 )
-                # mantener en sesión
                 session['restricciones'] = manual
 
         # 6) Respuesta
         return jsonify({
             "code": code,
             "valid": valid,
-            # <— añadimos aquí el mapeo nombre Gurobi → frase NL
             "mapping": current_app.shift_store.name_to_nl
         }), 200
 
@@ -334,7 +323,6 @@ def convert():
 @routes.route('/api/optimize', methods=['POST'])
 def optimize():
     """Activa las restricciones seleccionadas y ejecuta la optimización."""
-    # Verificar que el optimizador esté inicializado
     if not hasattr(current_app, 'shift_store'):
         return jsonify({"error": "No se encontró ningún modelo."}), 400
     optimizer: ShiftOptimizer = current_app.shift_store
@@ -342,19 +330,15 @@ def optimize():
     data = request.get_json() or {}
     active_list = data.get('active_constraints', [])
 
-    # Desactivar todas las restricciones
     for nl, info in optimizer.restricciones_validadas.items():
         info["activa"] = False
 
-    # Activar solo las seleccionadas
     for nl in active_list:
         if nl in optimizer.restricciones_validadas:
             optimizer.restricciones_validadas[nl]["activa"] = True
 
-    # Ejecutar la optimización
     optimization_info = optimizer.optimizar() or {}
 
-    # Construir la solución
     if optimizer.model.status == gp.GRB.OPTIMAL:
         solution = {
             str(key): var.X
@@ -364,7 +348,6 @@ def optimize():
     else:
         solution = "No se encontró una solución óptima."
 
-    # Exportar resultados a Excel
     variables = session.get('variables', {})
     exportar_resultados(optimizer.model, optimizer.decision_vars, variables)
 

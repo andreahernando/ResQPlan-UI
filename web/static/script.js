@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const constraintInput = document.getElementById("constraint");
   const convertButton   = document.getElementById("convert-button");
 
-  // Al principio: modo sólo lectura y handler de aviso
   if (constraintInput) {
     constraintInput.addEventListener("mousedown", e => {
       if (!contextReady) {
@@ -11,7 +10,6 @@ document.addEventListener("DOMContentLoaded", function () {
         e.stopImmediatePropagation();
         showToast("warning", "Primero ingresa un contexto y pulsa “Subir”.");
       }
-      // si contextReady===true, no hacemos nada y se abre el textarea
     });
   }
 
@@ -22,7 +20,6 @@ document.addEventListener("DOMContentLoaded", function () {
         e.stopImmediatePropagation();
         showToast("warning", "Primero ingresa un contexto y pulsa “Subir”.");
       }
-      // si contextReady===true, deja que siga su listener normal
     });
   }
 
@@ -36,11 +33,9 @@ document.addEventListener("DOMContentLoaded", function () {
   if (loadingOverlay) loadingOverlay.style.display = "none";
 
 
-  // Panel y lista de restricciones detectadas
   const detectedPanel = document.getElementById('detected-panel');
   const detectedList = document.getElementById('detected-constraints');
 
-  // Toggle sidebar
   const sidebar = document.getElementById("project-sidebar");
   const btnToggle = document.getElementById("toggle-sidebar");
   const btnClose = document.getElementById("close-sidebar");
@@ -52,9 +47,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Referencias a los elementos de la UI
   const deleteProjectBtn = document.getElementById("delete-project");
-  // Oculta el botón global
   if (deleteProjectBtn) deleteProjectBtn.style.display = "none";
   const newPrompt = document.getElementById("new-project-prompt");
   const newNameInput = document.getElementById("new-project-name");
@@ -65,11 +58,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const newProjectBtn   = document.getElementById("new-project-btn");
 
   newProjectBtn.addEventListener("click", () => {
-    // Mostrar el prompt como flex (recuerda tu CSS usa display:flex)
     newPrompt.style.display = "flex";
-    // Limpiar valor previo
     newNameInput.value = "";
-    // Enfocar el input para que aparezca el cursor
     newNameInput.focus();
   });
   const contextWarning = document.getElementById('context-warning');
@@ -91,26 +81,22 @@ document.addEventListener("DOMContentLoaded", function () {
   renderContextControls();
 
   document.querySelectorAll('.info-icon').forEach(icon => {
-    // Texto de ayuda según ID
     const helpText = {
       'info-context': 'Aquí debes escribir el contexto: información general y datos relevantes para la optimización.',
       'info-constraints': 'Aquí introduces las restricciones en lenguaje natural, una por línea, que tu modelo debe cumplir.'
     }[icon.id];
 
-    // Crea el elemento tooltip
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip';
     tooltip.innerText = helpText;
     document.body.appendChild(tooltip);
 
-    // Posicionar y mostrar
     icon.addEventListener('mouseenter', e => {
       const rect = icon.getBoundingClientRect();
       tooltip.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
       tooltip.style.left = (rect.left + window.scrollX) + 'px';
       tooltip.style.display = 'block';
     });
-    // Ocultar al salir
     icon.addEventListener('mouseleave', () => {
       tooltip.style.display = 'none';
     });
@@ -124,28 +110,24 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!editBtn || !titleSpan) return;
 
     editBtn.onclick = () => {
-      // Ocultar elementos actuales
       editBtn.style.display = "none";
       titleSpan.style.display = "none";
 
-      // Crear elementos de edición
       const input = document.createElement("input");
       input.type = "text";
       input.value = currentProjectName;
-      input.id = "project-name-input";         // <-- coincide con el CSS
-      // no hace falta inline styles de background
+      input.id = "project-name-input";
 
       const saveBtn = document.createElement("button");
-      saveBtn.id = "save-project-inline";       // <-- coincide con el CSS
+      saveBtn.id = "save-project-inline";
       saveBtn.innerText = "💾";
       saveBtn.title = "Guardar nombre";
 
       const cancelBtn = document.createElement("button");
-      cancelBtn.id = "cancel-project-inline";   // <-- coincide con el CSS
+      cancelBtn.id = "cancel-project-inline";
       cancelBtn.innerText = "✖️";
       cancelBtn.title = "Cancelar";
 
-      // Insertar en el DOM justo después del título
       titleSpan.parentNode.insertBefore(input, editBtn);
       input.after(saveBtn, cancelBtn);
 
@@ -153,7 +135,6 @@ document.addEventListener("DOMContentLoaded", function () {
       input.select();
 
       cancelBtn.onclick = () => {
-        // Restaurar UI
         input.remove();
         saveBtn.remove();
         cancelBtn.remove();
@@ -163,10 +144,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       saveBtn.onclick = async () => {
         const newName = input.value.trim();
-        if (!newName || newName === currentProjectName) {
-          cancelBtn.click();
-          return;
-        }
+        if (!newName || newName === currentProjectName) return cancelBtn.click();
 
         try {
           await fetch(`/api/projects/${currentProjectId}`, {
@@ -178,9 +156,8 @@ document.addEventListener("DOMContentLoaded", function () {
           sessionStorage.setItem('currentProjectName', newName);
           titleSpan.textContent = currentProjectName;
 
-          // Actualizar el nombre en la lista de proyectos
           document.querySelectorAll("#project-list li").forEach(li => {
-            if (li.dataset.id == currentProjectId) {
+            if (li.dataset.id === currentProjectId) {
               li.firstChild.textContent = currentProjectName;
             }
           });
@@ -200,10 +177,6 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-
-
-
-  // — Función auxiliar para parsear expresiones lineales —
   function parseLinExpr(exprStr, varsMap) {
     const expr = new Gurobi.LinExpr();
     exprStr.replace(/\s+/g, '').split('+').forEach(term => {
@@ -214,7 +187,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return expr;
   }
 
-  // — Reconstruir modelo Gurobi desde el estado serializado —
   function rebuildGurobiModel(state) {
     const model = new Gurobi.Model();
     const varsMap = {};
@@ -239,8 +211,6 @@ document.addEventListener("DOMContentLoaded", function () {
     return model;
   }
 
-
-  // ——— API calls ———
   async function listProjects() {
     const res = await fetch("/api/projects");
     const { projects } = await res.json();
@@ -280,7 +250,6 @@ document.addEventListener("DOMContentLoaded", function () {
     await fetch(`/api/projects/${id}`, { method: "DELETE" });
   }
 
-  // ——— Refrescar la lista de proyectos en la UI ———
   async function refreshProjectOptions() {
     const headerDiv = document.getElementById("project-header");
     const titleSpan  = document.getElementById("project-title");
@@ -304,7 +273,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (contextWarning) {
       contextWarning.style.visibility = 'hidden';
     }
-    // Oculta el panel de restricciones detectadas
     if (detectedPanel) {
       detectedPanel.style.display = 'none';
     }
@@ -315,22 +283,17 @@ document.addEventListener("DOMContentLoaded", function () {
         li.textContent = p.name;
         li.dataset.id = p.id;
 
-        // Dentro de refreshProjectOptions(), justo después de crear deleteBtn:
         const duplicateBtn = document.createElement("button");
         duplicateBtn.classList.add("duplicate-btn");
         duplicateBtn.innerHTML = `<i class="fas fa-clone"></i>`; // Icono de duplicar
         duplicateBtn.title = "Duplicar proyecto";
 
         duplicateBtn.addEventListener("click", async (e) => {
-          e.stopPropagation(); // para no disparar el click de carga del proyecto
+          e.stopPropagation();
 
-          // 1) Cargar los datos completos del proyecto original
           const orig = await loadProject(p.id);
-          if (orig.error) {
-            return showToast("error", "No se pudo cargar el proyecto original.");
-          }
+          if (orig.error) return showToast("error", "No se pudo cargar el proyecto original.");
 
-          // 2) Generar un nombre nuevo con sufijo "1"
           let newName = `${orig.name}1`;
 
           const allNames = (await listProjects()).map(x => x.name);
@@ -339,7 +302,6 @@ document.addEventListener("DOMContentLoaded", function () {
             newName = `${orig.name} ${++suffix}`;
           }
 
-          // 3) Construir el payload copiando toda la info y cambiando solo el nombre
           const clonePayload = {
             name: newName,
             context: orig.context,
@@ -349,7 +311,6 @@ document.addEventListener("DOMContentLoaded", function () {
             gurobiState: orig.gurobiState
           };
 
-          // 4) Enviar a la API para crear el duplicado
           try {
             const res = await fetch("/api/projects", {
               method: "POST",
@@ -367,24 +328,21 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         });
 
-        // Finalmente añádelo junto al deleteBtn:
         li.appendChild(duplicateBtn);
 
 
 
-        // Crear el botón de borrar con un icono
         const deleteBtn = document.createElement("button");
         deleteBtn.classList.add("delete-btn");
-        deleteBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`; // Icono de papelera
+        deleteBtn.innerHTML = `<i class="fas fa-trash-alt"></i>`;
         deleteBtn.addEventListener("click", async (e) => {
-          e.stopPropagation(); // Evita que el clic se propague al li
+          e.stopPropagation();
           if (!confirm(`¿Borrar el proyecto “${p.name}”?`)) return;
           await deleteProject(p.id);
           showToast("warning", `Proyecto “${p.name}” eliminado`);
-          await refreshProjectOptions(); // Refrescar la lista después de borrar
+          await refreshProjectOptions();
         });
 
-        // Añadir el botón de borrar al li
         li.appendChild(deleteBtn);
 
         li.addEventListener("click", async () => {
@@ -406,14 +364,12 @@ document.addEventListener("DOMContentLoaded", function () {
           const proj = await loadProject(p.id);
           if (proj.error) return showToast("error", "Error cargando proyecto");
 
-          // ——— Recarga de la UI —————————————————————————————————————
           currentProjectId = proj.id;
           currentProjectName = proj.name;
           sessionStorage.setItem('currentProjectId', proj.id);
           sessionStorage.setItem('currentProjectName', proj.name);
           contextInput.innerText = proj.context || "";
           originalText = contextInput.innerText;
-          // ─── Si al cargar ya hay contexto, desbloqueamos directamente ───
           if (proj.context && proj.context.trim().length > 0) {
             contextReady = true;
           } else {
@@ -427,7 +383,6 @@ document.addEventListener("DOMContentLoaded", function () {
             showToast("success", `Modelo Gurobi de “${proj.name}” reconstruido`);
           }
 
-          // ——— Mostrar título en header ———
           const headerDiv = document.getElementById("project-header");
           const titleSpan = document.getElementById("project-title");
 
@@ -506,7 +461,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
 
-  // ——— Botones y eventos ———
   document.getElementById("new-project-btn").addEventListener("click", () => {
     newPrompt.style.display = "block";
   });
@@ -554,7 +508,6 @@ document.addEventListener("DOMContentLoaded", function () {
     await refreshProjectOptions();
   });
 
-  // ——— Inicializar ———
   refreshProjectOptions();
 
 
@@ -604,17 +557,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function continuar() {
         const ctx = contextInput.innerText.trim();
-        if (!ctx) {
-          showToast("warning", "Por favor ingresa algún contexto.");
-          return;
-        }
+        if (!ctx) return showToast("warning", "Por favor ingresa algún contexto.");
 
-        // ── Reinicio de UI previa ──
         ['edit-context', 'summary-context', 'cancel-edit', 'ok-button'].forEach(id => {
           const btn = document.getElementById(id);
           if (btn) btn.remove();
         });
-        // Oculta sección de detecciones y lista limpia
         if (detectedPanel) {
           detectedPanel.style.display = 'none';
           detectedList.innerHTML = '';
@@ -637,14 +585,11 @@ document.addEventListener("DOMContentLoaded", function () {
             throw new Error(`Error al parsear JSON de respuesta`);
           }
 
-          // si hubo error HTTP, extraemos el mensaje y abortamos
           if (!res.ok) {
-            // tu backend devuelve { message: "…"} o { error: "…"}
             const errMsg = data.message ?? data.error ?? `Error HTTP ${res.status}`;
             throw new Error(errMsg);
           }
 
-          // éxito: devolvemos el JSON completo
           return data;
         })
 
@@ -652,20 +597,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
           if (loadingOverlay) loadingOverlay.style.display = "none";
 
-          // 1) Guardar variables
           sessionStorage.setItem("variables", JSON.stringify(p.result));
           contextReady = true;
           if (constraintInput) constraintInput.readOnly = false;
 
-          // Resaltar restricciones detectadas inline en el contexto
           if (p.result.detected_constraints && p.result.detected_constraints.length) {
             contextWarning.style.visibility = 'visible';
 
-            // 1) Coger el texto plano original
             let html = contextInput.innerText;
 
-            // 2) Para cada NL detectada, reemplazamos cada aparición
-            //    por un <mark> con data-nl y clase “clickable”
             p.result.detected_constraints.forEach(nl => {
               const esc = nl.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
               const regex = new RegExp(`(${esc})`, 'g');
@@ -674,17 +614,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 `<mark class="highlight clickable" data-nl="${nl}">$1</mark>`
               );
             });
-
-            // 3) Inyectar el HTML con los <mark> dentro del div editable
             contextInput.innerHTML = html;
-
-
-            // 4) Ocultamos el panel de lista porque ya no lo usamos
             detectedPanel.style.display = 'none';
 
-            // 5) Hacer cada <mark.clickable> “respondedor” a clicks
             contextInput.querySelectorAll('mark.highlight.clickable').forEach(mark => {
-              // 1) Estilos “clicable”
               mark.style.cursor = 'pointer';
               mark.title = 'Haz clic para agregar esta restricción';
 
@@ -692,49 +625,37 @@ document.addEventListener("DOMContentLoaded", function () {
                 const nl = mark.dataset.nl;
                 if (mark.classList.contains('added')) return;  // ya agregado
 
-                // 2) Confirmación
-                const confirmar = confirm(`¿Agregar la restricción:\n\n“${nl}”?`);
+                const confirmar = confirm(`¿Quieres agregar la restricción:\n\n“${nl}”?`);
                 if (!confirmar) return;
 
-                // 3) Preparamos la barra de progreso para 1 ítem
                 const progressContainer = document.getElementById('progress-container');
                 const progressBar       = document.getElementById('progress-bar');
                 const progressLabel     = document.getElementById('progress-label');
                 progressBar.max   = 1;
                 progressBar.value = 0;
-                progressLabel.textContent = `Procesando 1 de 1…`;
+                progressLabel.textContent = `Procesando 0 de 1…`;
                 progressContainer.style.display = 'block';
 
-                // 4) Feedback inmediato en el mark
                 mark.classList.add('adding');
                 mark.textContent = '';
 
                 try {
-                  // 5) Llamada a tu función de validación
                   await intentarConvertir(nl);
 
-                  // 6) Actualizamos la barra de progreso
-                  progressBar.value = 1;
-                  progressLabel.textContent = `Procesado 0 de 1`;
-
-                  // 7) Reconstruimos todo el contexto sin los <mark>
                   const textoPlano = contextInput.innerText;
                   contextInput.innerHTML = textoPlano;
                   sessionStorage.setItem('savedContext', contextInput.innerText);
 
-                  // 8) Guardado automático en backend
                   await autoSaveProject();
                   showToast('success', `“${nl}” agregada correctamente.`);
 
                 } catch (err) {
                   console.error(err);
-                  // Restauramos el mark original
                   mark.classList.remove('adding');
                   mark.textContent = nl;
                   alert('Error al agregar la restricción. Por favor, inténtalo de nuevo.');
 
                 } finally {
-                  // 9) Ocultamos la barra de progreso
                   progressContainer.style.display = 'none';
                 }
               });
@@ -743,7 +664,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
           } else {
-            // Ocultar el warning si no hay restricciones
             contextWarning.style.visibility = 'hidden';
           }
 
@@ -753,7 +673,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
           showToast("success", "Contexto procesado correctamente.");
 
-          // 6) Y solo invocamos renderizado de botones + bloqueo
           renderContextControls();
 
 
@@ -769,7 +688,6 @@ document.addEventListener("DOMContentLoaded", function () {
           btnSave.innerHTML = '<i class="fas fa-arrow-up"></i> Subir';
           btnContainer.append(btnSave);
 
-          // Vuelve a enlazar el listener
           btnSave.addEventListener("click", continuar);
         });
     }
@@ -789,7 +707,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function attachInlineEditor(li, label, guardarRestricciones, showToast) {
-      // Contenedor para los controles de edición (alineados a la derecha)
       const controlsWrapper = document.createElement("div");
       controlsWrapper.classList.add("edit-controls");
       controlsWrapper.style.display = "flex";
@@ -823,8 +740,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
       editButton.addEventListener("click", () => {
         const oldText = label.textContent;
-
-        // Input de edición (más ancho)
         const inputEdit = document.createElement("input");
         inputEdit.type = "text";
         inputEdit.value = oldText;
@@ -835,14 +750,12 @@ document.addEventListener("DOMContentLoaded", function () {
             e.preventDefault();
             saveBtn.click();
           }
-          // Escape para cancelar:
           if (e.key === "Escape") {
             e.preventDefault();
             cancelBtn.click();
           }
         });
 
-        // Contenedor para guardar/cancelar
         const inlineControls = document.createElement("div");
         inlineControls.classList.add("inline-controls");
         inlineControls.style.display = "flex";
@@ -863,33 +776,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
         inlineControls.append(saveBtn, cancelBtn);
 
-        // Reemplazar label y controles
         label.replaceWith(inputEdit);
         controlsWrapper.replaceWith(inlineControls);
 
-        // Focus al input
         inputEdit.focus();
         inputEdit.select();
 
-        // Cancelar edición
         cancelBtn.addEventListener("click", () => {
           inputEdit.replaceWith(label);
           inlineControls.replaceWith(controlsWrapper);
         });
 
-        // Guardar edición
         saveBtn.addEventListener("click", async () => {
           const newText = inputEdit.value.trim();
           if (!newText || newText === oldText) return cancelBtn.click();
-          // --- 1) Mostrar spinner y desactivar botones ---
           const originalContent = saveBtn.textContent;
-          saveBtn.textContent = "";                 // vacío para meter spinner
+          saveBtn.textContent = "";
             cancelBtn.style.display = "none";
           saveBtn.disabled = true;
           cancelBtn.disabled = true;
 
           const spinner = document.createElement("span");
-          spinner.classList.add("save-spinner");         // definiremos estilos CSS abajo
+          spinner.classList.add("save-spinner");
           saveBtn.appendChild(spinner);
 
           try {
@@ -914,7 +822,6 @@ document.addEventListener("DOMContentLoaded", function () {
             showToast("error", "Error al editar restricción.");
             console.error(e);
 
-            // --- 4) Si falla, restauramos el botón para reintentar o cancelar ---
             saveBtn.removeChild(spinner);
             saveBtn.textContent = originalContent;
             saveBtn.disabled = false;
@@ -923,7 +830,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       });
 
-      // Acción eliminar
     deleteButton.addEventListener("click", async () => {
       const confirmDelete = confirm("¿Estás seguro de que quieres eliminar esta restricción?");
       if (!confirmDelete) return;
@@ -937,7 +843,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const result = await res.json();
 
         if (res.ok && result.success) {
-          // 1) Elimino el <li> de la restricción
           li.remove();
           markDirty()
           guardarRestricciones();
@@ -945,10 +850,8 @@ document.addEventListener("DOMContentLoaded", function () {
           showToast("success", "Restricción eliminada correctamente.");
 
           await autoSaveProject();
-          // 2) Compruebo si queda alguna relajada
           const anyRelaxed = !!document.querySelector(".restriccion-item.relaxed-highlight");
 
-          // 3) Si no queda ninguna, quito también la nota de warning
           if (!anyRelaxed) {
             const note = document.getElementById("relaxed-note");
             if (note) note.remove();
@@ -976,7 +879,6 @@ document.addEventListener("DOMContentLoaded", function () {
           const result = await res.json();
 
           if (res.ok && result.code) {
-            // Quitar popups anteriores
             document.querySelectorAll(".code-popup").forEach(p => p.remove());
 
             const popup = document.createElement("div");
@@ -987,20 +889,16 @@ document.addEventListener("DOMContentLoaded", function () {
             `;
             document.body.appendChild(popup);
 
-            // Dimensiones
             const buttonRect = e.target.getBoundingClientRect();
             const popupWidth = popup.offsetWidth;
             const spacing = 8;
 
-            // Encontrar contenedor panel
             const panel = e.target.closest(".panel");
             const panelRect = panel.getBoundingClientRect();
 
-            // Coordenadas base
             let left = buttonRect.left + window.scrollX - popupWidth - spacing;
             let top = buttonRect.top + window.scrollY;
 
-            // Evitar que se salga del panel por la izquierda
             const minLeft = panelRect.left + window.scrollX + 10;
             if (left < minLeft) left = minLeft;
 
@@ -1008,12 +906,10 @@ document.addEventListener("DOMContentLoaded", function () {
             popup.style.left = `${left}px`;
             popup.style.top = `${top}px`;
 
-            // Botón cerrar
             popup.querySelector(".close-popup").addEventListener("click", () => {
               popup.remove();
             });
 
-            // Cerrar si se hace clic fuera
             const closeOnOutsideClick = (evt) => {
               if (!popup.contains(evt.target) && evt.target !== viewButton) {
                 popup.remove();
@@ -1040,18 +936,15 @@ document.addEventListener("DOMContentLoaded", function () {
           body: JSON.stringify({ constraint }),
         });
 
-        // 1) Parseamos siempre el JSON de respuesta
         const data = await res.json().catch(() => {
           throw new Error("Respuesta no válida del servidor");
         });
 
-        // 2) Si la respuesta NO es 2xx, lanzamos con el mensaje de error
         if (!res.ok) {
           const msg = data.message ?? `Error HTTP ${res.status}`;
           throw new Error(msg);
         }
 
-        // 3) Si la restricción no es válida según el backend, lo notificamos y salimos
         if (data.valid === false) {
           const msg = data.message ?? "La restricción no aplica al contexto proporcionado.";
           showToast("error", msg);
@@ -1060,11 +953,9 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        // 4) ¡La restricción es válida! → añadimos a la lista
         const lista = document.querySelector(".restricciones-list");
         if (!lista) return;
 
-        // Evitar duplicados
         if (
           Array.from(lista.children).some(
             li => li.querySelector("label")?.innerText === constraint
@@ -1098,12 +989,10 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (err) {
         const msg = err.message ?? String(err);
 
-        // Errores de fetch o status ≠ 2xx
         showToast("error", msg);
         const resDiv = document.getElementById("constraint-result");
         if (resDiv) resDiv.innerText = msg;
 
-        // Reintentos automáticos si es un error distinto de “no aplica”
         if (intentos > 1 && !["La restricción no aplica al contexto proporcionado."].includes(msg)) {
           await new Promise(r => setTimeout(r, 1000));
           return intentarConvertir(constraint, intentos - 1);
@@ -1124,17 +1013,14 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        // Preparo lista de restricciones
         const constraints = raw
           .split("\n")
           .map((x) => x.trim())
           .filter(Boolean);
 
-        // Limpio textarea y pongo foco
         inp.value = "";
         inp.focus();
 
-        // Mostrar y configurar barra de progreso
         const progressContainer = document.getElementById("progress-container");
         const progressBar       = document.getElementById("progress-bar");
         const progressLabel     = document.getElementById("progress-label");
@@ -1143,11 +1029,9 @@ document.addEventListener("DOMContentLoaded", function () {
         progressLabel.textContent = `Procesando 0 de ${constraints.length}…`;
         progressContainer.style.display = "block";
 
-        // Deshabilito botón y marco estado
         procesandoRestricciones = true;
         convertButton.disabled  = true;
 
-        // Itero y actualizo progreso
         for (let i = 0; i < constraints.length; i++) {
           const c = constraints[i];
           await intentarConvertir(c);
@@ -1155,7 +1039,6 @@ document.addEventListener("DOMContentLoaded", function () {
           progressLabel.textContent = `Procesando ${i + 1} de ${constraints.length}…`;
         }
 
-        // Restauro estado inicial
         procesandoRestricciones = false;
         convertButton.disabled   = false;
         progressContainer.style.display = "none";
@@ -1172,13 +1055,10 @@ document.addEventListener("DOMContentLoaded", function () {
         return div;
       })();
 
-      // 1) Limpio el contenedor de botones
       btnContainer.innerHTML = '';
 
-      // 2) Compruebo si hay texto en el contexto
       const hasCtx = contextInput.innerText.trim().length > 0;
 
-      // 3) Habilito o deshabilito el textarea según corresponda
       if (hasCtx) {
         contextInput.setAttribute('contenteditable', 'false');
       } else {
@@ -1212,7 +1092,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         btnContainer.append(btnEdit, btnSummary);
 
-        // Callback para “Editar”
         btnEdit.addEventListener('click', () => {
           let prevNote = document.getElementById('relaxed-note');
           if (prevNote) prevNote.remove();
@@ -1254,7 +1133,6 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         });
 
-        // Callback para “Ver resumen”
         btnSummary.addEventListener('click', () => {
           const data = JSON.parse(sessionStorage.getItem('variables') || '{}');
           const { resources = {}, variables = {} } = data;
@@ -1269,13 +1147,11 @@ document.addEventListener("DOMContentLoaded", function () {
           function formatArray(arr) {
             const n = arr.length;
             if (n === 0) {
-              return '';  // nada para listas vacías
-            } else if (n <= 5) {
-              // Pocos elementos: mostramos todos
+              return '';
+            } else if (n <= 20) {
               return '[' + arr.map(v => JSON.stringify(v)).join(', ') + ']';
             } else {
-              // Muchos elementos: mostramos solo los dos primeros y el último
-              const firstTwo = arr.slice(0, 2).map(v => JSON.stringify(v)).join(', ');
+              const firstTwo = arr.slice(0, 15).map(v => JSON.stringify(v)).join(', ');
               const lastOne  = JSON.stringify(arr[n - 1]);
               return `[${firstTwo}, ..., ${lastOne}]`;
             }
@@ -1300,10 +1176,8 @@ document.addEventListener("DOMContentLoaded", function () {
             Object.entries(obj).forEach(([key, vals]) => {
               let disp;
               if (Array.isArray(vals)) {
-                // Siempre en formato array truncado
                 disp = formatArray(vals);
               } else {
-                // Para cualquier otro valor, lo convertimos a string y truncamos si es necesario
                 disp = truncate(String(vals));
               }
 
@@ -1323,12 +1197,10 @@ document.addEventListener("DOMContentLoaded", function () {
           const content = document.getElementById('summary-popup-content');
           content.innerHTML = '';
 
-          // 1) Crea y estiliza el título
           const title = document.createElement('h2');
           title.textContent  = 'Variables identificadas';
 
 
-          // 2) Inserta el título y luego la tabla
           content.appendChild(title);
           content.appendChild(table);
 
@@ -1368,7 +1240,6 @@ document.addEventListener("DOMContentLoaded", function () {
         updateManualConstraintsInfo()
     }
 
-    // cargar al inicio
     cargarRestricciones();
 
 
@@ -1387,7 +1258,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         mostrarPantallaCarga();
 
-        // Preparamos el array de restricciones activas
         const activeConstraints = Array.from(items)
           .filter(li => li.querySelector('.chk-rest').checked)
           .map(li => li.querySelector('label').innerText);
@@ -1400,16 +1270,13 @@ document.addEventListener("DOMContentLoaded", function () {
           });
           const data = await res.json();
 
-          // 1) Ocultamos overlay
           loadingOverlay.style.display = "none";
 
-          // 2) Guardamos resultado en sessionStorage
           sessionStorage.setItem('optimizationResult', JSON.stringify(data));
           sessionStorage.setItem('relaxedConstraints', JSON.stringify(data.relaxed_constraints || []));
 
           sessionStorage.setItem('savedContext', contextInput.innerText);
 
-          // 3) Redirigimos a la página de resultados
           window.location.href = '/results';
         } catch (error) {
           loadingOverlay.style.display = "none";
@@ -1426,9 +1293,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     if (contextInput) contextInput.focus();
 
-    // ——— Al volver con history.back(), restaurar contexto, reaplicar highlight y mostrar aviso ———
     window.addEventListener('pageshow', () => {
-      // 0) Restaurar contexto si lo teníamos guardado
       const contextInput = document.getElementById('context');
       const savedCtx = sessionStorage.getItem('savedContext');
       if (savedCtx !== null && contextInput) {
@@ -1444,7 +1309,6 @@ document.addEventListener("DOMContentLoaded", function () {
         contextReady = false;
       }
 
-      // 1) Reaplicar highlight de restricciones relajadas
       const relaxed = JSON.parse(sessionStorage.getItem('relaxedConstraints') || '[]');
       const items   = document.querySelectorAll('.restriccion-item');
       let hasRelaxed = false;
@@ -1459,11 +1323,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
 
-      // 2) Eliminamos aviso previo si existía
       let prevNote = document.getElementById('relaxed-note');
       if (prevNote) prevNote.remove();
 
-      // 3) Si hay al menos una relajada, insertamos el aviso
       if (hasRelaxed) {
         const note = document.createElement('div');
         note.id = 'relaxed-note';
@@ -1479,13 +1341,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
-    // ——— Estado de guardado y funciones globales ———
     let isSaved = true;
 
     const saveStatusElem = document.getElementById("save-status");
     let saveButtonElem  = document.getElementById("save-button");
 
-    // 1) Actualiza la UI del estado de guardado
     function updateSaveUI() {
       if (!saveStatusElem || !saveButtonElem) return;
       if (isSaved) {
@@ -1497,7 +1357,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    // 2) Marca que hay cambios pendientes
     function markDirty() {
       if (isSaved) {
         isSaved = false;
@@ -1505,19 +1364,16 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    // ——— Configuración de handlers de guardado ———
     function setupSaveHandlers() {
       const contextInput = document.getElementById("context");
       const restrList    = document.querySelector(".restricciones-list");
 
-      // Comprueba que exista el botón y el status (puede cambiar tras un refresh)
       saveButtonElem   = document.getElementById("save-button");
       if (!saveStatusElem || !saveButtonElem) {
         console.warn("No encontré #save-status o #save-button");
         return;
       }
 
-      // 3) Asociar eventos que marcan el estado “sucio”
       if (contextInput) {
         contextInput.addEventListener("input", markDirty);
       }
@@ -1526,12 +1382,10 @@ document.addEventListener("DOMContentLoaded", function () {
         restrList.addEventListener("click", markDirty);
       }
 
-      // 4) Evitar múltiples bindings: clona y reemplaza el botón
       const newSaveBtn = saveButtonElem.cloneNode(true);
       saveButtonElem.parentNode.replaceChild(newSaveBtn, saveButtonElem);
       saveButtonElem = newSaveBtn;
 
-      // 5) Listener para el botón “Guardar”
       saveButtonElem.addEventListener("click", async () => {
         saveStatusElem.textContent = "Guardando…";
         saveButtonElem.disabled    = true;
@@ -1548,7 +1402,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
 
-      // 6) Inicializa la UI según el estado actual
       updateSaveUI();
     }
 
@@ -1557,7 +1410,6 @@ document.addEventListener("DOMContentLoaded", function () {
       const info = document.getElementById('no-constraints-info');
       const lista = document.querySelector('.restricciones-list');
       if (!lista) return;
-      // si no hay elementos o todos están removidos, mostramos info
       if (lista.children.length === 0) {
         info.style.display = 'block';
       } else {

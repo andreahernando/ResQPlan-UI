@@ -85,7 +85,6 @@ def extract_variables_from_context(context: str) -> dict:
         if "error" in data:
             return {"error": data["error"]}
 
-        # Inicializar lista de restricciones detectadas si no viene
         if 'detected_constraints' not in data:
             data['detected_constraints'] = []
 

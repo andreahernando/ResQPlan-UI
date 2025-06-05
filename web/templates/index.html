@@ -5,10 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>ResQPlan</title>
 
-  <!-- Estilos propios -->
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
 
-  <!-- Font Awesome para los iconos -->
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
@@ -43,20 +41,16 @@
       </button>
     </header>
     <div class="sidebar-content">
-      <!-- Botón para crear un proyecto nuevo -->
       <button id="new-project-btn" class="new-project-btn">+ Nuevo proyecto…</button>
 
-      <!-- Prompt para nombrar el nuevo proyecto -->
       <div id="new-project-prompt" class="new-prompt">
         <input type="text" id="new-project-name" placeholder="Nombre del proyecto" />
         <button id="create-project">Crear</button>
         <button id="cancel-create">Cancelar</button>
       </div>
 
-      <!-- Lista de proyectos -->
       <ul id="project-list" class="project-list"></ul>
 
-      <!-- Footer con botones guardar/borrar -->
       <div class="sidebar-footer">
         <button id="delete-project" disabled>🗑 Borrar</button>
       </div>
@@ -156,10 +150,8 @@
     </div>
   </div>
 
-  <!-- Toast container -->
   <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
-  <!-- Script principal -->
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

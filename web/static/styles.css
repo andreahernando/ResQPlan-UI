@@ -21,8 +21,8 @@ body {
   padding: 10px 20px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;      /* ¡desde la izquierda! */
-  position: relative;               /* para el absolute interno */
+  justify-content: flex-start;
+  position: relative;
 }
 
 .main-header .logo {
@@ -39,7 +39,6 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  /* Estilos nuevos */
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
   padding: 0.25rem 0.75rem;
@@ -89,7 +88,7 @@ body {
     min-height: auto;
     background-color: #dfeffc;
     border-radius: 10px;
-    padding: 20px 30px;        /
+    padding: 20px 30px;
     margin-top: 30px;
     text-align: center;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -211,14 +210,14 @@ mark.highlight {
 
 }
 
-/* Título dentro del panel, si lo tuvieras */
+
 .panel h2 {
   font-size: 20px;
   margin-bottom: 8px;
   text-align: center;
 }
 
-/* Textarea de entrada: igual que .context-panel textarea */
+
 .panel textarea {
   width: 100%;
   min-height: 100px;
@@ -251,7 +250,7 @@ mark.highlight {
   transform: scale(1.05);
 }
 
-/* Lista de restricciones: fondo, borde y sombras */
+
 .restricciones-list {
   max-height: 300px;
   overflow-y: auto;
@@ -266,7 +265,7 @@ mark.highlight {
 .restricciones-list:empty {
     display: none;
 }
-/* Cada ítem de restricción, acorde a los cards de contexto */
+
 .restriccion {
   background-color: #f8fbff;
   border: 1px solid #aacbe2;
@@ -302,8 +301,7 @@ mark.highlight {
 }
 
 
-/* ------------------------------------------------------------------ */
-/* 1) Sobrescribir sólo los botones dentro de cada ítem de restricción */
+
 .restriccion .btn,
 .restriccion-item .edit-btn,
 .restriccion-item .save-btn,
@@ -317,7 +315,6 @@ mark.highlight {
   margin: 0 4px !important;
 }
 
-/* 2) Hover suave para indicar clicable sin usar azul fuerte */
 .restriccion .btn:hover,
 .restriccion-item .edit-btn:hover,
 .restriccion-item .save-btn:hover,
@@ -330,7 +327,7 @@ mark.highlight {
 
 
 
-/* Contenedor de botones alineado a la derecha */
+
 .button-container {
     width: 100%;
     display: flex;
@@ -378,7 +375,7 @@ mark.highlight {
 
 /* Pantalla de carga */
 .loading-overlay {
-    display: none; /* Oculto por defecto */
+    display: none;
     position: fixed;
     top: 0;
     left: 0;
@@ -415,7 +412,7 @@ mark.highlight {
     100% { transform: rotate(360deg); }
 }
 
-/* Responsividad para pantallas pequeñas */
+
 @media (max-width: 768px) {
     .container {
         flex-direction: column;
@@ -428,7 +425,7 @@ mark.highlight {
     }
 }
 
-/* Reutiliza tu estilo genérico de modals */
+
 #summary-popup.modal {
   display: none;
   position: fixed;
@@ -447,7 +444,7 @@ mark.highlight {
   width: 90%;
   position: relative;
 }
-/* Close button del popup de resumen */
+
 #summary-popup .close-summary-popup {
   color: #333;
   background: rgba(0, 0, 0, 0.1);
@@ -495,7 +492,7 @@ mark.highlight {
     padding: 10px;
 }
 
-/* Estilo general del checkbox */
+
 .chk-rest {
   appearance: none;
   -webkit-appearance: none;
@@ -526,7 +523,7 @@ mark.highlight {
   top: -2px;
 }
 
-/* Asegura que el label quede alineado correctamente */
+
 .restriccion-item label {
   cursor: pointer;
   user-select: none;
@@ -534,21 +531,21 @@ mark.highlight {
 .chk-rest:hover {
   border-color: #0056b3;
 }
-/* Alinea los items del <li> en flex, texto a la izquierda, controles a la derecha */
+
 .restriccion-item {
   display: flex;
   align-items: center;
   padding: 4px 0;
 }
 
-/* Input de edición más ancho */
+
 .edit-input {
   flex: 1;
   padding: 4px 8px;
   font-size: 14px;
 }
 
-/* Botones de edición, guardar, cancelar */
+
 .edit-btn,
 .save-btn,
 .cancel-btn {
@@ -566,17 +563,17 @@ mark.highlight {
     border-radius: 4px;
 }
 
-/* Wrapper de controles en modo normal */
+
 .edit-controls {
-  /* ya es flex y margin-left:auto en línea */
+
 }
 
-/* Wrapper de controles en modo inline */
+
 .inline-controls button {
   margin-left: 4px;
 }
 
-/* Spinner específico para el botón de “Guardar” en la edición inline */
+
 .save-spinner {
   width: 1em;
   height: 1em;
@@ -643,7 +640,7 @@ mark.highlight {
   pointer-events: none;
 }
 
-/* contenedor base de toasts sin cambio */
+
 .toast {
   display: flex;
   align-items: center;
@@ -661,7 +658,7 @@ mark.highlight {
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
-/* icono y botón cerrar heredan color */
+
 .toast .icon,
 .toast button {
   color: inherit;
@@ -685,7 +682,7 @@ mark.highlight {
   border-left: 4px solid #e53935;
   color: #c62828;
 }
-.toast.error .icon { /* mismos ajustes de icono */ }
+.toast.error .icon {  }
 
 /* Advertencia */
 .toast.warning {
@@ -693,9 +690,9 @@ mark.highlight {
   border-left: 4px solid #f9a825;
   color: #ef6c00;
 }
-.toast.warning .icon { /* mismos ajustes de icono */ }
+.toast.warning .icon {  }
 
-/* animaciones sin cambiar */
+
 .toast.show {
   opacity: 1;
   transform: translateX(0);
@@ -705,7 +702,7 @@ mark.highlight {
   transform: translateX(100%);
 }
 
-/* Panel “Restricciones Detectadas” (oculto por defecto) */
+
 #detected-panel {
   display: none;
   width: 95%;
@@ -733,7 +730,7 @@ mark.highlight {
   color: #495057;
 }
 
-/* Sidebar base */
+
 .project-sidebar {
   position: fixed;
   top: 0; left: 0;
@@ -748,12 +745,12 @@ mark.highlight {
   border-radius: 10px;
 }
 
-/* Cuando está abierto */
+
 .project-sidebar.open {
   transform: translateX(0);
 }
 
-/* Encabezado del sidebar */
+
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -765,7 +762,7 @@ mark.highlight {
 }
 
 
-/* Contenido principal */
+
 .sidebar-content {
   flex: 1;
   padding: 1rem;
@@ -775,13 +772,13 @@ mark.highlight {
   border-bottom-right-radius: 10px;
 }
 
-/* Prompt de nuevo proyecto */
+
 .new-prompt {
   display: none;
   margin-top: 0.5rem;
 }
 
-/* Lista de proyectos */
+
 .project-list {
   list-style: none;
   margin: 1rem 0;
@@ -804,7 +801,7 @@ mark.highlight {
   border-radius: 4px;
 }
 
-/* Footer con botones */
+
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid #eee;
@@ -814,7 +811,7 @@ mark.highlight {
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* Botón hamburguesa a la izquierda */
+
 .sidebar-toggle {
   order: -1;
   margin-right: 1rem;
@@ -826,7 +823,7 @@ mark.highlight {
   cursor: pointer;
   padding: 0.5rem;
 }
-/* Botón cerrar dentro del sidebar */
+
 .close-btn {
   background: none;
   border: none;
@@ -834,7 +831,7 @@ mark.highlight {
   cursor: pointer;
   color: var(--primary-color);
 }
-/* Botón “Nuevo proyecto” */
+
 .new-project-btn {
   display: block;
   width: 100%;
@@ -855,16 +852,16 @@ mark.highlight {
   transform: scale(1.05);
 }
 
-/* Contenedor del prompt de nuevo proyecto: flex row, alineado con gap */
+
 #new-project-prompt {
-  display: none;            /* oculto hasta que JS le ponga display:block */
+  display: none;
   margin-bottom: 1rem;
   padding: 0;
   align-items: center;
   gap: 0.5rem;
 }
 
-/* Input ocupa todo el ancho restante, con bordes suaves */
+
 #new-project-prompt input#new-project-name {
   flex: 1;
   padding: 0.5rem 0.75rem;
@@ -880,7 +877,7 @@ mark.highlight {
   box-shadow: 0 0 0 2px rgba(0,123,255,0.2);
 }
 
-/* Botones “Crear” y “Cancelar” junto al input */
+
 #new-project-prompt button {
   padding: 0.5rem 0.75rem;
   font-size: 0.9rem;
@@ -890,7 +887,7 @@ mark.highlight {
   transition: background 0.2s, transform 0.1s;
 }
 
-/* Crear = primario */
+
 #new-project-prompt button#create-project {
   background: var(--primary-color);
   color: #fff;
@@ -900,7 +897,7 @@ mark.highlight {
   transform: scale(1.05);
 }
 
-/* Cancelar = secundario */
+
 #new-project-prompt button#cancel-create {
   background: #6c757d;
   color: #fff;
@@ -920,7 +917,7 @@ mark.highlight {
   margin-left: 10px;
   transition: color 0.3s ease;
   position: absolute;
-  right: 40px; /* 40px del borde derecho para situarlo al lado del delete-btn */
+  right: 40px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -1016,7 +1013,7 @@ transition:     background 0.3s;
 background-color: #ffe8a1;
 }
 
-/* Aviso tras volver si hay restricciones relajadas */
+
 .relaxed-note {
   margin: 1rem 0;
   padding: 0.75rem 1rem;
@@ -1030,7 +1027,7 @@ background-color: #ffe8a1;
   gap: 0.5rem;
 }
 
-/* — Contenedor de guardado (estilo “pill” con blur) — */
+
 #save-controls {
   position: absolute;
   top: 50%;
@@ -1040,7 +1037,7 @@ background-color: #ffe8a1;
   align-items: center;
   gap: 0.5rem;
 
-  /* Mismo look que project-header */
+
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(8px);
 
@@ -1050,7 +1047,7 @@ background-color: #ffe8a1;
   z-index: 1100;
 }
 
-/* — Texto de estado — */
+
 #save-status {
   display: flex;
   align-items: center;
@@ -1060,7 +1057,7 @@ background-color: #ffe8a1;
   text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
 
-/* — Iconos de estado antes del texto — */
+
 #save-controls.all-saved #save-status::before {
   content: "✔️";
 }
@@ -1068,7 +1065,7 @@ background-color: #ffe8a1;
   content: "⚠️";
 }
 
-/* — Botón de guardar — */
+
 #save-button {
   background: none;
   border: none;
@@ -1105,19 +1102,19 @@ mark.highlight.clickable.added {
   background: #d4edda;
 }
 
-/* Icono de ayuda discreto */
+
 .info-icon {
   cursor: help;
   margin-left: 0.5rem;
-  font-size: 1rem; /* mismo tamaño base que el texto */
-  color: rgba(255, 255, 255, 0.8); /* semitransparente sobre fondo primario */
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.8);
   transition: color 0.2s;
   vertical-align: middle;
 }
 
 .context-panel .info-icon,
 .panel h2 .info-icon {
-  /* Sobre fondos claros de panel usamos primary-color oscuro */
+
   color: var(--primary-color);
 }
 .info-icon:hover {
@@ -1159,7 +1156,7 @@ mark.highlight.clickable.added {
   margin: 0 0 1rem 0;
 }
 
-/* Edición inline del nombre de proyecto */
+
 #project-name-input {
   background: transparent;
   border: none;
@@ -1172,7 +1169,7 @@ mark.highlight.clickable.added {
   min-width: 100px;
 }
 
-/* Botones inline junto al título */
+
 #save-project-inline,
 #cancel-project-inline {
   background: transparent;
@@ -1182,7 +1179,7 @@ mark.highlight.clickable.added {
   margin-left: 4px;
 }
 
-/* Iconos de hover para mejor accesibilidad */
+
 #save-project-inline:hover,
 #cancel-project-inline:hover {
   opacity: 0.7;
