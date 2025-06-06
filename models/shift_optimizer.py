@@ -5,7 +5,6 @@ from utils.constraint_translator import translate_constraint_to_code
 
 
 class ShiftOptimizer:
-    # ───────────────────────────────────────── constructor ────────────────
     def __init__(self, specs: dict):
         self.specs = specs
         self._dv_code_str = specs["decision_variables"]

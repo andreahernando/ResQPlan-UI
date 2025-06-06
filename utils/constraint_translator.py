@@ -88,7 +88,6 @@ def extract_variables_from_context(context: str) -> dict:
         if 'detected_constraints' not in data:
             data['detected_constraints'] = []
 
-        # Validaciones básicas
         if not all(k in data for k in ('variables', 'resources', 'decision_variables', 'detected_constraints')):
             return {"error": "El JSON de salida no tiene las claves requeridas."}
         vars_dict = data['variables']
@@ -153,12 +152,10 @@ def translate_constraint_to_code(nl_constraint: str, specs: dict) -> str:
             )
             content = resp.choices[0].message.content.strip()
 
-            # Si es JSON de error, lo devolvemos como dict
             if content.startswith('{') and '"error"' in content:
                 return json.loads(content)
 
-            # Si no, asumimos que es código
-            compile(content, '<string>', 'exec')  # valida el código
+            compile(content, '<string>', 'exec')
             return content
 
         except Exception as e:
