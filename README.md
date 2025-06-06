@@ -132,9 +132,10 @@ Pulsa **Descargar Excel** para obtener el horario optimizado con las asignacione
 
 ---
 
-> **Nota**: Para un correcto funcionamiento, asegúrate de tener:
->
-> 1. Clave de OpenAI configurada en la variable `OPENAI_API_KEY`.
-> 2. Gurobi instalado y licenciado.
-> 3. MongoDB en ejecución en `mongodb://localhost:27017/`.
+### ⚠️ Requisitos imprescindibles para el correcto funcionamiento
 
+- 🔑 **Clave OpenAI:** Configura la variable de entorno `OPENAI_API_KEY`.  
+- 🧩 **Gurobi:** Debe estar instalado y con licencia válida.  
+- 🍃 **MongoDB:** Asegúrate de que esté corriendo en `mongodb://localhost:27017/`.
+
+---
